@@ -25,7 +25,7 @@ def create_sale():
 @sale_bp.get("")
 @jwt_required()
 def list_sales():
-    sales = Sale.query.order_by(Sale.sale_date.desc()).all()
+    sales = Sale.query.order_by(Sale.created_at.asc(), Sale.id.asc()).all()
     return success_response(
         [
             {

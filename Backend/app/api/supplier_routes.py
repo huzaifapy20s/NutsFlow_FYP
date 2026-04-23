@@ -11,7 +11,11 @@ supplier_bp = Blueprint("supplier_bp", __name__)
 @supplier_bp.get("")
 @jwt_required()
 def list_suppliers():
-    suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.supplier_name.asc()).all()
+    suppliers = (
+        Supplier.query.filter_by(is_active=True)
+        .order_by(Supplier.created_at.asc(), Supplier.id.asc())
+        .all()
+    )
     return success_response(
         [
             {

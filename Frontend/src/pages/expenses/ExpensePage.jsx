@@ -78,6 +78,8 @@ export default function ExpensePage() {
 
       <DataTable
         columns={[
+          { key: "seq", title: "No.", render: (row, index) => index + 1 },
+          { key: "id", title: "Expense ID" },
           { key: "expense_date", title: "Date" },
           { key: "description", title: "Description" },
           { key: "amount", title: "Amount", render: (row) => formatCurrency(row.amount) },

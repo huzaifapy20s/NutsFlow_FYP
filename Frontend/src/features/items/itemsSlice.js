@@ -1,6 +1,9 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import axiosClient from "../../api/axiosClient";
 
+/** Monotonic per dispatch so slower HTTP responses cannot overwrite a newer list (e.g. after a bill update). */
+let itemsFetchSeq = 0;
+
 const initialDraft = {
   item_name: "",
   sku: "",
@@ -12,12 +15,21 @@ const initialDraft = {
   low_stock_threshold: "0.00",
 };
 
-export const fetchItems = createAsyncThunk("items/fetchItems", async (_, { rejectWithValue }) => {
+export const fetchItems = createAsyncThunk("items/fetchItems", async (_, { rejectWithValue, signal }) => {
+  const requestId = ++itemsFetchSeq;
   try {
-    const response = await axiosClient.get("/api/items");
-    return response.data.data;
+    const response = await axiosClient.get("/api/items", { signal });
+    const raw = response.data?.data;
+    const data = Array.isArray(raw) ? raw : [];
+    return { data, requestId };
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to fetch items.");
+    if (error?.code === "ERR_CANCELED" || error?.name === "CanceledError") {
+      return rejectWithValue({ requestId, aborted: true, message: "" });
+    }
+    return rejectWithValue({
+      requestId,
+      message: error.response?.data?.message || "Failed to fetch items.",
+    });
   }
 });
 
@@ -63,6 +75,8 @@ const itemsSlice = createSlice({
   name: "items",
   initialState: {
     list: [],
+    /** Highest `requestId` applied to `list` from fetchItems.fulfilled (stale responses are ignored). */
+    highestItemsFetchId: 0,
     loading: false,
     submitting: false,
     error: null,
@@ -100,12 +114,29 @@ const itemsSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchItems.fulfilled, (state, action) => {
+        const { data, requestId } = action.payload;
+        if (requestId < state.highestItemsFetchId) {
+          return;
+        }
+        state.highestItemsFetchId = requestId;
         state.loading = false;
-        state.list = action.payload;
+        state.error = null;
+        state.list = data;
       })
       .addCase(fetchItems.rejected, (state, action) => {
+        if (action.meta?.aborted) {
+          return;
+        }
+        const payload = action.payload;
+        if (payload && typeof payload === "object" && payload.aborted) {
+          return;
+        }
+        const reqId = payload && typeof payload === "object" ? payload.requestId : null;
+        if (reqId != null && reqId < state.highestItemsFetchId) {
+          return;
+        }
         state.loading = false;
-        state.error = action.payload;
+        state.error = typeof payload === "string" ? payload : payload?.message || "Failed to fetch items.";
       })
       .addCase(createItem.pending, (state) => {
         state.submitting = true;

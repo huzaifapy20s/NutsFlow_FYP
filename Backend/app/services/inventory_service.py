@@ -1,3 +1,4 @@
+from collections import defaultdict
 from decimal import Decimal
 
 from app.models import Item, MovementType, ReferenceType, StockMovement, db
@@ -41,11 +42,19 @@ class InventoryService:
 
     @staticmethod
     def validate_sale_stock(sale_items: list) -> None:
+        """Check stock against total quantity per product (a sale can list the same item on multiple lines)."""
+        totals = defaultdict(lambda: Decimal("0.00"))
+        item_by_id = {}
         for sale_item in sale_items:
-            if sale_item.item.stock_quantity < sale_item.quantity:
+            iid = sale_item.item_id
+            totals[iid] += sale_item.quantity
+            item_by_id[iid] = sale_item.item
+        for iid, total_q in totals.items():
+            item = item_by_id[iid]
+            if item.stock_quantity < total_q:
                 raise ValueError(
-                    f"Insufficient stock for item '{sale_item.item.item_name}'. "
-                    f"Available: {sale_item.item.stock_quantity}, Requested: {sale_item.quantity}"
+                    f"Insufficient stock for item '{item.item_name}'. "
+                    f"Available: {item.stock_quantity}, Requested: {total_q}"
                 )
 
     @staticmethod

@@ -1,11 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { fetchItems } from "../../features/items/itemsSlice";
 import { formatCurrency } from "../../utils/formatters";
 import { ArrowLeft, Download, Edit, Trash2 } from "lucide-react";
 
 export default function BillDetailView() {
   const { billId } = useParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [bill, setBill] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -58,6 +61,7 @@ export default function BillDetailView() {
         throw new Error('Failed to delete bill');
       }
 
+      dispatch(fetchItems());
       navigate('/bills');
     } catch (error) {
       console.error("Failed to delete bill:", error);

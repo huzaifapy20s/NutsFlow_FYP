@@ -11,7 +11,12 @@ item_bp = Blueprint("item_bp", __name__)
 @item_bp.get("")
 @jwt_required()
 def list_items():
-    items = Item.query.filter_by(is_active=True).order_by(Item.item_name.asc()).all()
+    # Oldest first (top of list), newest added last (bottom of list), in sequence.
+    items = (
+        Item.query.filter_by(is_active=True)
+        .order_by(Item.created_at.asc(), Item.id.asc())
+        .all()
+    )
     return success_response(
         [
             {

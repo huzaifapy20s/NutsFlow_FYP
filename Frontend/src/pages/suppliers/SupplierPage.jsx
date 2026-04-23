@@ -174,6 +174,8 @@ export default function SupplierPage() {
 
           <DataTable
             columns={[
+              { key: "seq", title: "No.", render: (row, index) => index + 1 },
+              { key: "id", title: "Supplier ID" },
               { key: "supplier_name", title: "Supplier" },
               { key: "contact_person", title: "Contact Person" },
               { key: "phone", title: "Phone" },
@@ -305,6 +307,10 @@ export default function SupplierPage() {
             </div>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="font-semibold">Supplier ID</p>
+                <p>{selectedSupplier.id}</p>
+              </div>
               <div>
                 <p className="font-semibold">Supplier</p>
                 <p>{selectedSupplier.supplier_name}</p>

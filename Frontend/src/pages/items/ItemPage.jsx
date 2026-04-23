@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useLocation } from "react-router-dom";
 import DataTable from "../../components/common/DataTable";
 import {
   createItem,
@@ -15,6 +16,7 @@ import { formatCurrency } from "../../utils/formatters";
 
 export default function ItemPage() {
   const dispatch = useDispatch();
+  const location = useLocation();
   const { list, draft, editingId, submitting, error } = useSelector((state) => state.items);
   const [activeActionItem, setActiveActionItem] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -70,9 +72,25 @@ export default function ItemPage() {
   };
 
   useEffect(() => {
-    dispatch(fetchItems());
+    const promise = dispatch(fetchItems());
     return () => {
+      promise.abort();
       clearUndo();
+    };
+  }, [dispatch, location.key]);
+
+  useEffect(() => {
+    let lastFetch;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        lastFetch?.abort();
+        lastFetch = dispatch(fetchItems());
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      lastFetch?.abort();
     };
   }, [dispatch]);
 
@@ -176,6 +194,7 @@ export default function ItemPage() {
 
         <DataTable
           columns={[
+            { key: "item_no", title: "Item No", render: (row, index) => index + 1 },
             { key: "item_name", title: "Item" },
             { key: "sku", title: "SKU" },
             { key: "category", title: "Category" },

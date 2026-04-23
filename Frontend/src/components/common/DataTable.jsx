@@ -21,7 +21,7 @@ export default function DataTable({ columns, rows, emptyText = "No data found." 
             <tr key={row.id || index} className="border-b border-slate-100 last:border-b-0">
               {columns.map((column) => (
                 <td key={column.key} className="px-4 py-3">
-                  {column.render ? column.render(row) : row[column.key]}
+                  {column.render ? column.render(row, index) : row[column.key]}
                 </td>
               ))}
             </tr>

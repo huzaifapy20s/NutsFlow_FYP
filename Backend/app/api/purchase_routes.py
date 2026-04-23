@@ -25,7 +25,9 @@ def create_purchase():
 @purchase_bp.get("")
 @jwt_required()
 def list_purchases():
-    purchases = Purchase.query.order_by(Purchase.purchase_date.desc()).all()
+    purchases = (
+        Purchase.query.order_by(Purchase.created_at.asc(), Purchase.id.asc()).all()
+    )
     return success_response(
         [
             {

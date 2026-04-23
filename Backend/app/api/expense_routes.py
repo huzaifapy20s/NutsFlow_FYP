@@ -25,7 +25,9 @@ def create_expense():
 @expense_bp.get("")
 @jwt_required()
 def list_expenses():
-    expenses = Expense.query.order_by(Expense.expense_date.desc()).all()
+    expenses = (
+        Expense.query.order_by(Expense.created_at.asc(), Expense.id.asc()).all()
+    )
     return success_response(
         [
             {

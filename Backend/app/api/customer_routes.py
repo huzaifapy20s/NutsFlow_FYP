@@ -12,7 +12,11 @@ customer_bp = Blueprint("customer_bp", __name__)
 @customer_bp.get("")
 @jwt_required()
 def list_customers():
-    customers = Customer.query.filter_by(is_active=True).order_by(Customer.full_name.asc()).all()
+    customers = (
+        Customer.query.filter_by(is_active=True)
+        .order_by(Customer.created_at.asc(), Customer.id.asc())
+        .all()
+    )
     return success_response(
         [
             {

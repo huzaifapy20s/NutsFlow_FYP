@@ -316,6 +316,8 @@ export default function PurchasePage() {
           ) : null}
           <DataTable
             columns={[
+              { key: "seq", title: "No.", render: (row, index) => index + 1 },
+              { key: "id", title: "Purchase ID" },
               { key: "invoice_number", title: "Invoice" },
               { key: "supplier_name", title: "Supplier" },
               { key: "purchase_date", title: "Date" },

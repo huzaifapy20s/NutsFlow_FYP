@@ -169,6 +169,8 @@ export default function CustomerPage() {
 
           <DataTable
             columns={[
+              { key: "seq", title: "No.", render: (row, index) => index + 1 },
+              { key: "id", title: "Customer ID" },
               { key: "full_name", title: "Name" },
               { key: "phone", title: "Phone" },
               { key: "email", title: "Email" },
@@ -300,6 +302,10 @@ export default function CustomerPage() {
             </div>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="font-semibold">Customer ID</p>
+                <p>{selectedCustomer.id}</p>
+              </div>
               <div>
                 <p className="font-semibold">Name</p>
                 <p>{selectedCustomer.full_name}</p>

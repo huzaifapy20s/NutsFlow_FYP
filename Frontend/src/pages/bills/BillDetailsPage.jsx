@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchRecentBills } from "../../features/reports/reportsSlice";
+import { fetchItems } from "../../features/items/itemsSlice";
 import { formatCurrency } from "../../utils/formatters";
 import { useNavigate } from "react-router-dom";
 import { Edit, Eye, Trash2 } from "lucide-react";
@@ -39,8 +40,8 @@ export default function BillDetailsPage() {
         throw new Error('Failed to delete bill');
       }
 
-      // Refetch bills after successful deletion
       dispatch(fetchRecentBills());
+      dispatch(fetchItems());
     } catch (error) {
       console.error("Failed to delete bill:", error);
       alert("Failed to delete bill");
@@ -77,6 +78,12 @@ export default function BillDetailsPage() {
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      No.
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Bill ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                       Invoice
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
@@ -103,8 +110,14 @@ export default function BillDetailsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-200">
-                  {recentBills.map((bill) => (
+                  {recentBills.map((bill, index) => (
                     <tr key={bill.id} className="hover:bg-slate-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                        {index + 1}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                        {bill.id}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
                         {bill.invoice_number}
                       </td>

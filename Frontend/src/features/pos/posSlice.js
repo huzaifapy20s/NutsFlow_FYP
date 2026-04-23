@@ -8,21 +8,57 @@ const initialState = {
   paid_amount: "0.00",
   payment_method: "cash",
   notes: "",
+  /** 0–100, applied to line subtotal */
+  discount_percent: "0",
   cartItems: [],
   submitting: false,
   error: null,
 };
 
+function roundMoney(value) {
+  return Math.round((Number.isFinite(value) ? value : 0) * 100) / 100;
+}
+
+/** Per-line cent rounding; matches API line totals. */
+export function subtotalFromCart(cartItems) {
+  let cents = 0;
+  for (const row of cartItems) {
+    const q = Number(row.quantity || 0);
+    const p = Number(row.unit_price || 0);
+    cents += Math.round(q * p * 100);
+  }
+  return cents / 100;
+}
+
 export const submitSale = createAsyncThunk("pos/submitSale", async (_, { getState, rejectWithValue }) => {
   try {
     const state = getState().pos;
+    const subtotal = subtotalFromCart(state.cartItems);
+    let pct = Number(String(state.discount_percent ?? "0").replace(/,/g, "."));
+    if (!Number.isFinite(pct) || pct < 0) pct = 0;
+    if (pct > 100) pct = 100;
+    const discount_amount = roundMoney((subtotal * pct) / 100);
+    const totalAfterDiscount = roundMoney(subtotal - discount_amount);
+    if (totalAfterDiscount < 0) {
+      return rejectWithValue("Invalid discount: total would be negative.");
+    }
+
+    let paidNum = Number(String(state.paid_amount ?? "0").replace(/,/g, "."));
+    if (!Number.isFinite(paidNum) || paidNum < 0) paidNum = 0;
+    if (paidNum > totalAfterDiscount) {
+      paidNum = totalAfterDiscount;
+    }
+    const paidStr = roundMoney(paidNum).toFixed(2);
+
     const payload = {
       invoice_number: state.invoice_number,
       customer_id: state.customer_id || null,
       receipt_account_id: state.receipt_account_id || null,
-      paid_amount: state.paid_amount,
+      paid_amount: paidStr,
       payment_method: state.payment_method,
       notes: state.notes,
+      discount_amount: String(discount_amount.toFixed(2)),
+      tax_amount: "0.00",
       sale_items: state.cartItems.map((item) => ({
         item_id: item.item_id,
         quantity: item.quantity,
