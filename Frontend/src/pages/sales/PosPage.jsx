@@ -14,15 +14,18 @@ import {
 } from "../../features/pos/posSlice";
 import { formatCurrency } from "../../utils/formatters";
 
+const EMPTY_OPTIONS = [];
+
 export default function PosPage() {
   const dispatch = useDispatch();
   const { list: items } = useSelector((state) => state.items);
   const { list: customers } = useSelector((state) => state.customers);
   const { financialAccounts } = useSelector((state) => state.accounts);
-  const accountOptions = Array.isArray(financialAccounts) ? financialAccounts : [];
-  const itemOptions = Array.isArray(items) ? items : [];
-  const customerOptions = Array.isArray(customers) ? customers : [];
+  const accountOptions = Array.isArray(financialAccounts) ? financialAccounts : EMPTY_OPTIONS;
+  const itemOptions = Array.isArray(items) ? items : EMPTY_OPTIONS;
+  const customerOptions = Array.isArray(customers) ? customers : EMPTY_OPTIONS;
   const pos = useSelector((state) => state.pos);
+  const isWalkInCustomer = !String(pos.customer_id || "").trim();
 
   useEffect(() => {
     dispatch(fetchItems());
@@ -50,16 +53,22 @@ export default function PosPage() {
   useEffect(() => {
     const paid = Number(String(pos.paid_amount ?? "0").replace(/,/g, "."));
     if (!Number.isFinite(paid)) return;
-    if (total <= 0) {
+    const roundedTotal = Math.max(0, Math.round(total * 100) / 100);
+    const roundedPaid = Math.round(paid * 100) / 100;
+    if (roundedTotal <= 0) {
       if (paid > 0) {
         dispatch(setPosField({ field: "paid_amount", value: "0.00" }));
       }
       return;
     }
-    if (paid > total + 1e-6) {
-      dispatch(setPosField({ field: "paid_amount", value: total.toFixed(2) }));
+    if (isWalkInCustomer && roundedPaid < roundedTotal) {
+      dispatch(setPosField({ field: "paid_amount", value: roundedTotal.toFixed(2) }));
+      return;
     }
-  }, [total, pos.paid_amount, dispatch]);
+    if (paid > roundedTotal + 1e-6) {
+      dispatch(setPosField({ field: "paid_amount", value: roundedTotal.toFixed(2) }));
+    }
+  }, [total, pos.paid_amount, isWalkInCustomer, dispatch]);
 
   const [billModalOpen, setBillModalOpen] = useState(false);
   const [localBillError, setLocalBillError] = useState(null);
@@ -227,7 +236,14 @@ export default function PosPage() {
 
           <div>
             <label className="label">Paid Amount</label>
-            <input value={pos.paid_amount} onChange={(e) => dispatch(setPosField({ field: "paid_amount", value: e.target.value }))} />
+            <input
+              type="number"
+              min="0"
+              max={total}
+              step="0.01"
+              value={pos.paid_amount}
+              onChange={(e) => dispatch(setPosField({ field: "paid_amount", value: e.target.value }))}
+            />
           </div>
 
           <div>

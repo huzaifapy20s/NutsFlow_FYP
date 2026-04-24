@@ -1,4 +1,5 @@
 from decimal import Decimal
+from uuid import uuid4
 
 from app.models import Customer, FinancialAccount, Item, PaymentStatus, Sale, SaleItem, SaleStatus, db
 from app.models.enums import PaymentMethod as PaymentMethodEnum
@@ -8,6 +9,10 @@ from app.utils.validators import parse_decimal, parse_int, require_fields
 
 
 class SaleService:
+    @staticmethod
+    def _generate_invoice_number(user_id: int) -> str:
+        return f"SALE-{user_id}-{uuid4().hex[:12].upper()}"
+
     @staticmethod
     def _build_sale_item_instances(sale_items_data: list) -> tuple[Decimal, list]:
         """Build SaleItem ORM objects and subtotal from API rows (create / update)."""
@@ -85,8 +90,10 @@ class SaleService:
         elif paid_amount > 0:
             payment_status = PaymentStatus.PARTIAL
 
+        invoice_number = str(payload.get("invoice_number") or "").strip() or SaleService._generate_invoice_number(user_id)
+
         sale = Sale(
-            invoice_number=payload.get("invoice_number") or f"SALE-{str(user_id)}-{int(Decimal(total_amount) * 100)}",
+            invoice_number=invoice_number,
             customer_id=customer.id if customer else None,
             receipt_account_id=receipt_account.id if receipt_account else None,
             subtotal=subtotal,

@@ -33,6 +33,8 @@ export function subtotalFromCart(cartItems) {
 export const submitSale = createAsyncThunk("pos/submitSale", async (_, { getState, rejectWithValue }) => {
   try {
     const state = getState().pos;
+    const customerId = String(state.customer_id || "").trim();
+    const receiptAccountId = String(state.receipt_account_id || "").trim();
     const subtotal = subtotalFromCart(state.cartItems);
     let pct = Number(String(state.discount_percent ?? "0").replace(/,/g, "."));
     if (!Number.isFinite(pct) || pct < 0) pct = 0;
@@ -45,15 +47,21 @@ export const submitSale = createAsyncThunk("pos/submitSale", async (_, { getStat
 
     let paidNum = Number(String(state.paid_amount ?? "0").replace(/,/g, "."));
     if (!Number.isFinite(paidNum) || paidNum < 0) paidNum = 0;
+    if (!customerId && paidNum < totalAfterDiscount) {
+      paidNum = totalAfterDiscount;
+    }
     if (paidNum > totalAfterDiscount) {
       paidNum = totalAfterDiscount;
+    }
+    if (roundMoney(paidNum) > 0 && !receiptAccountId) {
+      return rejectWithValue("Select a receipt account when payment is greater than zero.");
     }
     const paidStr = roundMoney(paidNum).toFixed(2);
 
     const payload = {
       invoice_number: state.invoice_number,
-      customer_id: state.customer_id || null,
-      receipt_account_id: state.receipt_account_id || null,
+      customer_id: customerId || null,
+      receipt_account_id: receiptAccountId || null,
       paid_amount: paidStr,
       payment_method: state.payment_method,
       notes: state.notes,
@@ -103,7 +111,7 @@ const posSlice = createSlice({
     removeFromCart: (state, action) => {
       state.cartItems = state.cartItems.filter((item) => item.item_id !== action.payload);
     },
-    clearCart: (state) => {
+    clearCart: () => {
       return { ...initialState };
     },
   },
