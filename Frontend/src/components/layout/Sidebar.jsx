@@ -1,4 +1,4 @@
-import { BarChart3, Box, LayoutDashboard, Receipt, ShoppingCart, Store, Users, Wallet, Landmark, FileText } from "lucide-react";
+import { BarChart3, Box, LayoutDashboard, Receipt, ShoppingCart, Store, Users, Wallet, Landmark, FileText, TrendingUp, Star } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
 const navItems = [
@@ -12,8 +12,10 @@ const navItems = [
   { to: "/expenses", label: "Expenses", icon: Wallet },
   { to: "/accounts", label: "Accounts", icon: Landmark },
   { to: "/reports/profit-loss", label: "P/L Report", icon: BarChart3 },
+  { to: "/reports/income-statement", label: "Income Statement", icon: TrendingUp },
   { to: "/reports/sales", label: "Sales Report", icon: BarChart3 },
   { to: "/reports/stock", label: "Stock Report", icon: BarChart3 },
+  { to: "/reports/best-selling", label: "Best Selling", icon: Star },
 ];
 
 export default function Sidebar() {
@@ -23,14 +25,17 @@ export default function Sidebar() {
     <>
       <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white lg:block">
         <div className="p-6">
-          <h1 className="text-xl font-bold">Dry Fruit MS</h1>
-          <p className="mt-1 text-sm text-slate-500">Vite + React + Redux</p>
+          <h1 className="text-xl font-bold">Nuts Flow</h1>
+          <p className="mt-1 text-sm text-slate-500">Your Business Partner</p>
         </div>
 
         <nav className="space-y-1 px-4 pb-6">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = item.to === "/" ? location.pathname === "/" : location.pathname === item.to;
+            const isActive =
+              item.to === "/"
+                ? location.pathname === "/"
+                : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
 
             return (
               <NavLink

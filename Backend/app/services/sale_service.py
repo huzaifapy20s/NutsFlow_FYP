@@ -111,6 +111,7 @@ class SaleService:
 
         db.session.flush()
 
+        # Apply stock deduction for all items in this new sale
         InventoryService.apply_sale_stock(sale, sale.sale_items, user_id)
 
         if receipt_account and paid_amount > 0:
@@ -172,7 +173,7 @@ class SaleService:
         if not sale:
             raise LookupError("Sale not found.")
 
-        # Reverse inventory changes
+        # Reverse inventory changes — add sold quantities back to stock
         InventoryService.reverse_sale_stock(sale, sale.sale_items, user_id)
 
         # Reverse accounting entries
@@ -202,8 +203,13 @@ class SaleService:
     def update_sale(sale_id: int, payload: dict, user_id: int) -> dict:
         """Update bill totals, payment, customer, and receipt account.
 
-        Reverses the previous effect on customer balance, receipt (cash) balance,
-        and accounting entries, then applies the new state and a fresh sale journal.
+        Logic for stock:
+        - First, reverse old sale items stock (add old quantities back to stock).
+        - Then, delete old sale item rows from DB.
+        - Then, build new sale item objects and assign them to the sale.
+        - Finally, apply new sale items stock (deduct new quantities from stock).
+
+        This ensures stock is always correct in real time as quantities change.
         """
         sale = Sale.query.get(sale_id)
         if not sale:
@@ -214,36 +220,60 @@ class SaleService:
         old_customer = sale.customer
         old_receipt = sale.receipt_account
 
+        # Step 1: Reverse old customer balance effect
         if old_customer is not None and old_balance_due > 0:
             old_customer.opening_balance = (old_customer.opening_balance - old_balance_due).quantize(Decimal("0.01"))
 
+        # Step 2: Reverse old receipt account balance effect
         if old_receipt is not None and old_paid > 0:
             new_rcpt_bal = (old_receipt.current_balance - old_paid).quantize(Decimal("0.01"))
             if new_rcpt_bal < 0:
                 raise ValueError("Cannot update sale: receipt account balance would become invalid.")
             old_receipt.current_balance = new_rcpt_bal
 
+        # Step 3: Reverse old accounting journal entries
         AccountingService.reverse_sale_entry(sale, user_id)
 
+        # Step 4: Handle sale items update (if sale_items provided in payload)
         if "sale_items" in payload and payload.get("sale_items") is not None:
             sale_items_data = payload["sale_items"]
             if not isinstance(sale_items_data, list) or not sale_items_data:
                 raise ValueError("sale_items must be a non-empty list.")
+
+            # Step 4a: Save reference to old sale item objects BEFORE deleting them
+            # (we need them for stock reversal, since they hold quantity info)
             old_lines = list(sale.sale_items)
+
+            # Step 4b: Reverse stock for old sale items — add old quantities back to stock
             if old_lines:
                 InventoryService.reverse_sale_stock(sale, old_lines, user_id)
+
+            # Step 4c: Delete old sale item rows from the database
             for line in list(sale.sale_items):
                 db.session.delete(line)
             db.session.flush()
+            # After flush, old rows are removed from DB; sale.sale_items relationship is now empty
 
+            # Step 4d: Build new SaleItem objects from incoming payload
             new_subtotal, new_item_objs = SaleService._build_sale_item_instances(sale_items_data)
             sale.subtotal = new_subtotal
+
+            # Step 4e: Assign sale_id to each new item and add to session
             for sitem in new_item_objs:
                 sitem.sale_id = sale.id
                 db.session.add(sitem)
             db.session.flush()
-            InventoryService.apply_sale_stock(sale, list(sale.sale_items), user_id)
+            # After flush, new rows are written to DB
 
+            # Step 4f: Apply stock deduction for new sale items
+            # IMPORTANT: We pass new_item_objs directly here — NOT sale.sale_items.
+            # Reason: After flush, SQLAlchemy's relationship cache (sale.sale_items) may
+            # be stale and not include the newly added items in this same session.
+            # Passing new_item_objs directly guarantees we deduct stock for exactly
+            # the new items that were just built and saved.
+            InventoryService.apply_sale_stock(sale, new_item_objs, user_id)
+
+        # Step 5: Recalculate totals using updated discount/tax values
         discount = sale.discount_amount
         tax = sale.tax_amount
         if "discount_amount" in payload:
@@ -258,6 +288,7 @@ class SaleService:
             raise ValueError("Total cannot be negative. Reduce discount or adjust tax.")
         sale.total_amount = total_amount
 
+        # Step 6: Update customer if provided
         if "customer_id" in payload:
             cid = payload.get("customer_id")
             if cid in (None, ""):
@@ -268,6 +299,7 @@ class SaleService:
                     raise LookupError("Customer not found or inactive.")
                 sale.customer_id = cust.id
 
+        # Step 7: Update receipt account if provided
         if "receipt_account_id" in payload:
             rid = payload.get("receipt_account_id")
             if rid in (None, ""):
@@ -278,6 +310,7 @@ class SaleService:
                     raise LookupError("Receipt account not found or inactive.")
                 sale.receipt_account_id = acct.id
 
+        # Step 8: Update paid amount if provided
         paid = sale.paid_amount
         if "paid_amount" in payload:
             paid = parse_decimal(payload["paid_amount"], "paid_amount")
@@ -288,6 +321,7 @@ class SaleService:
         if sale.paid_amount > 0 and not sale.receipt_account_id:
             raise ValueError("receipt_account_id is required when paid_amount is greater than zero.")
 
+        # Step 9: Update payment method if provided
         if "payment_method" in payload:
             pm = payload.get("payment_method")
             if pm in (None, ""):
@@ -298,9 +332,11 @@ class SaleService:
                 except ValueError as exc:
                     raise ValueError("Invalid payment_method.") from exc
 
+        # Step 10: Update notes if provided
         if "notes" in payload:
             sale.notes = payload.get("notes")
 
+        # Step 11: Recalculate balance_due and payment_status
         sale.balance_due = (sale.total_amount - sale.paid_amount).quantize(Decimal("0.01"))
         if sale.balance_due > 0 and not sale.customer_id:
             raise ValueError("A customer is required when there is an outstanding balance.")
@@ -312,14 +348,17 @@ class SaleService:
         else:
             sale.payment_status = PaymentStatus.UNPAID
 
+        # Step 12: Apply new customer balance effect
         new_customer = sale.customer
         if new_customer is not None and sale.balance_due > 0:
             new_customer.opening_balance = (new_customer.opening_balance + sale.balance_due).quantize(Decimal("0.01"))
 
+        # Step 13: Apply new receipt account balance effect
         new_receipt = sale.receipt_account
         if new_receipt is not None and sale.paid_amount > 0:
             new_receipt.current_balance = (new_receipt.current_balance + sale.paid_amount).quantize(Decimal("0.01"))
 
+        # Step 14: Create fresh accounting journal entry for updated sale
         db.session.flush()
         AccountingService.create_sale_entry(sale, created_by_id=user_id)
 

@@ -19,8 +19,9 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6">
       <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-soft">
-        <h1 className="text-3xl font-bold">Sign in</h1>
-        <p className="mt-2 text-sm text-slate-500">Dry Fruit Management System</p>
+        <h1 className="text-3xl font-bold">Nuts Flow</h1>
+        <p className="mt-2 text-sm text-slate-500">Sign In</p>
+        <img src="logo.png" alt="Nuts Flow Logo" className="mx-auto mt-4"/>
 
         <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
           <div>

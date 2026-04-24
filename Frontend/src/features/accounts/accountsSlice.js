@@ -28,6 +28,7 @@ export const fetchCustomerAccounts = createAsyncThunk("accounts/fetchCustomerAcc
       account_type: "asset",
       current_balance: customer.opening_balance,
       is_active: customer.is_active,
+      entity_type: "customer",
     }));
   } catch (error) {
     return rejectWithValue(error.response?.data?.message || "Failed to fetch customer accounts.");
@@ -43,9 +44,40 @@ export const fetchSupplierAccounts = createAsyncThunk("accounts/fetchSupplierAcc
       account_type: "liability",
       current_balance: supplier.opening_balance,
       is_active: supplier.is_active,
+      entity_type: "supplier",
     }));
   } catch (error) {
     return rejectWithValue(error.response?.data?.message || "Failed to fetch supplier accounts.");
+  }
+});
+
+// General ledger for Chart of Accounts
+export const fetchGeneralLedger = createAsyncThunk("accounts/fetchGeneralLedger", async (accountId, { rejectWithValue }) => {
+  try {
+    const response = await axiosClient.get(`/api/accounts/general-ledger/${accountId}`);
+    return response.data.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || "Failed to fetch general ledger.");
+  }
+});
+
+// Dedicated ledger for a specific Customer
+export const fetchCustomerLedger = createAsyncThunk("accounts/fetchCustomerLedger", async (customerId, { rejectWithValue }) => {
+  try {
+    const response = await axiosClient.get(`/api/accounts/customer-ledger/${customerId}`);
+    return response.data.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || "Failed to fetch customer ledger.");
+  }
+});
+
+// Dedicated ledger for a specific Supplier
+export const fetchSupplierLedger = createAsyncThunk("accounts/fetchSupplierLedger", async (supplierId, { rejectWithValue }) => {
+  try {
+    const response = await axiosClient.get(`/api/accounts/supplier-ledger/${supplierId}`);
+    return response.data.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || "Failed to fetch supplier ledger.");
   }
 });
 
@@ -56,10 +88,18 @@ const accountsSlice = createSlice({
     financialAccounts: [],
     customerAccounts: [],
     supplierAccounts: [],
+    generalLedger: null,
+    ledgerLoading: false,
+    ledgerError: null,
     loading: false,
     error: null,
   },
-  reducers: {},
+  reducers: {
+    clearGeneralLedger: (state) => {
+      state.generalLedger = null;
+      state.ledgerError = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchChartOfAccounts.pending, (state) => {
@@ -113,8 +153,51 @@ const accountsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
         state.supplierAccounts = [];
+      })
+      // Chart of Account general ledger
+      .addCase(fetchGeneralLedger.pending, (state) => {
+        state.ledgerLoading = true;
+        state.ledgerError = null;
+        state.generalLedger = null;
+      })
+      .addCase(fetchGeneralLedger.fulfilled, (state, action) => {
+        state.ledgerLoading = false;
+        state.generalLedger = action.payload;
+      })
+      .addCase(fetchGeneralLedger.rejected, (state, action) => {
+        state.ledgerLoading = false;
+        state.ledgerError = action.payload;
+      })
+      // Customer ledger
+      .addCase(fetchCustomerLedger.pending, (state) => {
+        state.ledgerLoading = true;
+        state.ledgerError = null;
+        state.generalLedger = null;
+      })
+      .addCase(fetchCustomerLedger.fulfilled, (state, action) => {
+        state.ledgerLoading = false;
+        state.generalLedger = action.payload;
+      })
+      .addCase(fetchCustomerLedger.rejected, (state, action) => {
+        state.ledgerLoading = false;
+        state.ledgerError = action.payload;
+      })
+      // Supplier ledger
+      .addCase(fetchSupplierLedger.pending, (state) => {
+        state.ledgerLoading = true;
+        state.ledgerError = null;
+        state.generalLedger = null;
+      })
+      .addCase(fetchSupplierLedger.fulfilled, (state, action) => {
+        state.ledgerLoading = false;
+        state.generalLedger = action.payload;
+      })
+      .addCase(fetchSupplierLedger.rejected, (state, action) => {
+        state.ledgerLoading = false;
+        state.ledgerError = action.payload;
       });
   },
 });
 
+export const { clearGeneralLedger } = accountsSlice.actions;
 export default accountsSlice.reducer;

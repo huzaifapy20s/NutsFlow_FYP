@@ -38,6 +38,24 @@ export const fetchRecentBills = createAsyncThunk("reports/fetchRecentBills", asy
   }
 });
 
+export const fetchBestSelling = createAsyncThunk("reports/fetchBestSelling", async (limit = 20, { rejectWithValue }) => {
+  try {
+    const response = await axiosClient.get(`/api/reports/best-selling?limit=${limit}`);
+    return response.data.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || "Failed to fetch best-selling products.");
+  }
+});
+
+export const fetchIncomeStatement = createAsyncThunk("reports/fetchIncomeStatement", async (_, { rejectWithValue }) => {
+  try {
+    const response = await axiosClient.get("/api/reports/income-statement");
+    return response.data.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || "Failed to fetch income statement.");
+  }
+});
+
 const reportsSlice = createSlice({
   name: "reports",
   initialState: {
@@ -45,6 +63,8 @@ const reportsSlice = createSlice({
     salesReport: [],
     stockReport: [],
     recentBills: [],
+    bestSelling: [],
+    incomeStatement: null,
     salesPeriod: "daily",
     loading: false,
     error: null,
@@ -62,6 +82,10 @@ const reportsSlice = createSlice({
       .addCase(fetchProfitLoss.fulfilled, (state, action) => {
         state.loading = false;
         state.profitLoss = action.payload;
+      })
+      .addCase(fetchProfitLoss.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       })
       .addCase(fetchSalesReport.fulfilled, (state, action) => {
         state.salesReport = action.payload;
@@ -81,7 +105,27 @@ const reportsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      .addCase(fetchProfitLoss.rejected, (state, action) => {
+      .addCase(fetchBestSelling.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchBestSelling.fulfilled, (state, action) => {
+        state.loading = false;
+        state.bestSelling = Array.isArray(action.payload) ? action.payload : [];
+      })
+      .addCase(fetchBestSelling.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchIncomeStatement.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchIncomeStatement.fulfilled, (state, action) => {
+        state.loading = false;
+        state.incomeStatement = action.payload;
+      })
+      .addCase(fetchIncomeStatement.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

@@ -1,14 +1,87 @@
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { fetchItems } from "../../features/items/itemsSlice";
-import { formatCurrency } from "../../utils/formatters";
-import { ArrowLeft, Download, Edit, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit, Printer, Trash2 } from "lucide-react";
+
+const BUSINESS = {
+  name: "NUTS FLOW",
+  subtitle: "Dry Fruits ERP & POS",
+  address: "M.Zahid Trader Raja Bazar Rawalpindi, Pakistan",
+  phone1: "03293366565",
+  thankYou: "Thank you for shopping!",
+  footer: "Powered by NutsFlow",
+};
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
+function toNumber(value) {
+  const num = Number(value ?? 0);
+  return Number.isFinite(num) ? num : 0;
+}
+
+function formatAmount(value) {
+  const num = toNumber(value);
+  return num.toLocaleString("en-PK", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatReceiptDate(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getAuthToken() {
+  try {
+    return JSON.parse(localStorage.getItem("dfms_auth") || "{}")?.accessToken || "";
+  } catch {
+    return "";
+  }
+}
+
+function BarcodeBlock() {
+  const bars = [
+    2, 1, 3, 1, 2, 4, 1, 2, 3, 1, 1, 4, 2, 1, 3, 2, 1, 4, 1, 2, 2, 3, 1, 4,
+    2, 1, 3, 1, 2, 4, 1, 3, 2, 1,
+  ];
+
+  return (
+    <div className="nf-barcode" aria-hidden="true">
+      {bars.map((width, index) => (
+        <span
+          key={`${width}-${index}`}
+          className="nf-bar"
+          style={{ width: `${width}px` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ReceiptRow({ label, value, strong = false }) {
+  return (
+    <div className={`nf-summary-row ${strong ? "nf-summary-row-strong" : ""}`}>
+      <span>{label}</span>
+      <span>{value}</span>
+    </div>
+  );
+}
 
 export default function BillDetailView() {
   const { billId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+
   const [bill, setBill] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -17,29 +90,43 @@ export default function BillDetailView() {
   const fetchBillDetails = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api/sales/${billId}`, {
+      setError(null);
+
+      const response = await fetch(`${apiBaseUrl}/api/sales/${billId}`, {
         headers: {
-          'Authorization': `Bearer ${JSON.parse(localStorage.getItem('dfms_auth') || '{}')?.accessToken || ''}`
-        }
+          Authorization: `Bearer ${getAuthToken()}`,
+        },
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch bill details');
+        throw new Error("Failed to fetch bill details");
       }
 
       const data = await response.json();
       setBill(data.data);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Something went wrong");
     } finally {
       setLoading(false);
     }
   }, [billId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchBillDetails();
   }, [fetchBillDetails]);
+
+  const subtotal = useMemo(() => toNumber(bill?.subtotal), [bill]);
+  const discount = useMemo(() => toNumber(bill?.discount_amount), [bill]);
+  const tax = useMemo(() => toNumber(bill?.tax_amount), [bill]);
+  const total = useMemo(() => toNumber(bill?.total_amount), [bill]);
+  const paid = useMemo(() => toNumber(bill?.paid_amount), [bill]);
+  const balance = useMemo(() => toNumber(bill?.balance_due), [bill]);
+  const totalQty = useMemo(
+    () => (bill?.sale_items || []).reduce((sum, item) => sum + toNumber(item.quantity), 0),
+    [bill]
+  );
+
+  const customerName = bill?.customer?.full_name || "Walk-in Customer";
 
   const handleUpdateBill = () => {
     navigate(`/bills/${billId}/edit`);
@@ -50,36 +137,36 @@ export default function BillDetailView() {
 
     setDeleteLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api/sales/${billId}`, {
-        method: 'DELETE',
+      const response = await fetch(`${apiBaseUrl}/api/sales/${billId}`, {
+        method: "DELETE",
         headers: {
-          'Authorization': `Bearer ${JSON.parse(localStorage.getItem('dfms_auth') || '{}')?.accessToken || ''}`
-        }
+          Authorization: `Bearer ${getAuthToken()}`,
+        },
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete bill');
+        throw new Error("Failed to delete bill");
       }
 
       dispatch(fetchItems());
-      navigate('/bills');
-    } catch (error) {
-      console.error("Failed to delete bill:", error);
+      navigate("/bills");
+    } catch (err) {
+      console.error("Failed to delete bill:", err);
       alert("Failed to delete bill");
     } finally {
       setDeleteLoading(false);
     }
   };
 
-  const handlePrintBill = () => {
+  const handlePrint = () => {
     window.print();
   };
 
   if (loading) {
     return (
       <div className="p-6">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+        <div className="flex items-center justify-center py-16">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-slate-900" />
           <span className="ml-3 text-slate-600">Loading bill details...</span>
         </div>
       </div>
@@ -89,7 +176,7 @@ export default function BillDetailView() {
   if (error) {
     return (
       <div className="p-6">
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700">
           {error}
         </div>
       </div>
@@ -99,8 +186,8 @@ export default function BillDetailView() {
   if (!bill) {
     return (
       <div className="p-6">
-        <div className="text-center py-12">
-          <h3 className="text-lg font-medium text-slate-900">Bill not found</h3>
+        <div className="py-16 text-center">
+          <h3 className="text-lg font-semibold text-slate-900">Bill not found</h3>
           <p className="text-slate-500">The requested bill could not be found.</p>
         </div>
       </div>
@@ -108,159 +195,615 @@ export default function BillDetailView() {
   }
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => navigate('/bills')}
-            className="flex items-center text-slate-600 hover:text-slate-900"
-          >
-            <ArrowLeft size={20} className="mr-2" />
-            Back to Bills
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Bill Details</h1>
-            <p className="text-slate-600">Invoice: {bill.invoice_number}</p>
+    <>
+      <style>{`
+        .nf-bill-page {
+          min-height: 100%;
+          background: #f8fafc;
+          padding: 24px;
+        }
+
+        .nf-screen-toolbar {
+          max-width: 1100px;
+          margin: 0 auto 20px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+
+        .nf-toolbar-left {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .nf-back-btn,
+        .nf-action-btn {
+          border: 1px solid #cbd5e1;
+          background: #ffffff;
+          color: #0f172a;
+          border-radius: 12px;
+          padding: 10px 14px;
+          font-size: 14px;
+          font-weight: 600;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .nf-back-btn:hover,
+        .nf-action-btn:hover {
+          background: #f1f5f9;
+        }
+
+        .nf-action-btn-primary {
+          background: #0f172a;
+          color: #fff;
+          border-color: #0f172a;
+        }
+
+        .nf-action-btn-primary:hover {
+          background: #1e293b;
+        }
+
+        .nf-action-btn-danger {
+          background: #dc2626;
+          color: #fff;
+          border-color: #dc2626;
+        }
+
+        .nf-action-btn-danger:hover {
+          background: #b91c1c;
+        }
+
+        .nf-preview-shell {
+          max-width: 1100px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: minmax(300px, 420px) minmax(260px, 1fr);
+          gap: 24px;
+          align-items: start;
+        }
+
+        .nf-receipt-stage {
+          background: linear-gradient(180deg, #e2e8f0 0%, #f8fafc 100%);
+          border: 1px solid #dbe4ee;
+          border-radius: 20px;
+          padding: 24px;
+          display: flex;
+          justify-content: center;
+          min-height: 820px;
+        }
+
+        .nf-side-card {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 20px;
+          box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+          padding: 20px;
+        }
+
+        .nf-side-grid {
+          display: grid;
+          gap: 16px;
+        }
+
+        .nf-side-title {
+          font-size: 18px;
+          font-weight: 700;
+          color: #0f172a;
+          margin-bottom: 10px;
+        }
+
+        .nf-side-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 8px 0;
+          border-bottom: 1px dashed #e2e8f0;
+          font-size: 14px;
+        }
+
+        .nf-side-row:last-child {
+          border-bottom: none;
+        }
+
+        .nf-side-label {
+          color: #64748b;
+        }
+
+        .nf-side-value {
+          color: #0f172a;
+          font-weight: 600;
+          text-align: right;
+        }
+
+        .nf-receipt {
+          width: 80mm;
+          min-height: auto;
+          background: #ffffff;
+          color: #111827;
+          border-radius: 8px;
+          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+          padding: 10px 8px 14px;
+          font-family: Arial, Helvetica, sans-serif;
+          line-height: 1.25;
+        }
+
+        .nf-center {
+          text-align: center;
+        }
+
+        .nf-brand-mark {
+          width: 44px;
+          height: 44px;
+          margin: 0 auto 6px;
+          border: 1.6px solid #111827;
+          border-radius: 9999px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 800;
+          font-size: 15px;
+          letter-spacing: 0.08em;
+        }
+
+        .nf-store-name {
+          font-size: 18px;
+          font-weight: 800;
+          letter-spacing: 0.06em;
+          margin: 2px 0;
+          text-transform: uppercase;
+        }
+
+        .nf-store-subtitle,
+        .nf-store-meta {
+          font-size: 11px;
+          margin-top: 2px;
+        }
+
+        .nf-receipt-title {
+          margin: 10px 0 8px;
+          font-size: 13px;
+          font-weight: 700;
+          text-transform: uppercase;
+        }
+
+        .nf-section {
+          border-top: 1px dashed #111827;
+          padding-top: 8px;
+          margin-top: 8px;
+        }
+
+        .nf-meta-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 8px;
+          font-size: 11px;
+          margin-bottom: 4px;
+        }
+
+        .nf-meta-label {
+          color: #374151;
+          min-width: 74px;
+        }
+
+        .nf-meta-value {
+          color: #111827;
+          text-align: right;
+          flex: 1;
+          word-break: break-word;
+          font-weight: 600;
+        }
+
+        .nf-items-table {
+          width: 100%;
+          border-collapse: collapse;
+          table-layout: fixed;
+          margin-top: 8px;
+          font-size: 10.5px;
+        }
+
+        .nf-items-table th,
+        .nf-items-table td {
+          border: 1px solid #111827;
+          padding: 4px 3px;
+          vertical-align: top;
+        }
+
+        .nf-items-table th {
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          background: #f8fafc;
+          text-align: center;
+        }
+
+        .nf-col-item {
+          width: 38%;
+          text-align: left;
+          word-break: break-word;
+        }
+
+        .nf-col-qty {
+          width: 15%;
+          text-align: center;
+        }
+
+        .nf-col-rate {
+          width: 22%;
+          text-align: right;
+        }
+
+        .nf-col-total {
+          width: 25%;
+          text-align: right;
+        }
+
+        .nf-item-name {
+          font-weight: 600;
+        }
+
+        .nf-item-sub {
+          display: block;
+          color: #475569;
+          font-size: 9px;
+          margin-top: 2px;
+        }
+
+        .nf-summary-box {
+          width: 64%;
+          margin-left: auto;
+          margin-top: 10px;
+          border: 1px solid #111827;
+          padding: 6px 7px;
+        }
+
+        .nf-summary-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 8px;
+          font-size: 11px;
+          padding: 2px 0;
+        }
+
+        .nf-summary-row-strong {
+          font-weight: 800;
+        }
+
+        .nf-totals-strip {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 6px;
+          margin-top: 8px;
+          font-size: 10px;
+        }
+
+        .nf-chip {
+          border: 1px dashed #111827;
+          padding: 4px 6px;
+          text-align: center;
+        }
+
+        .nf-barcode {
+          height: 52px;
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+          gap: 1px;
+          margin: 10px 0 6px;
+        }
+
+        .nf-bar {
+          display: inline-block;
+          background: #111827;
+          height: 100%;
+        }
+
+        .nf-footer-note {
+          margin-top: 6px;
+          font-size: 11px;
+          text-align: center;
+        }
+
+        .nf-mini-logo {
+          margin-top: 8px;
+          text-align: center;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+        }
+
+        .nf-software-line {
+          margin-top: 6px;
+          font-size: 9px;
+          text-align: center;
+          color: #334155;
+        }
+
+        .nf-notes {
+          margin-top: 8px;
+          border-top: 1px dashed #111827;
+          padding-top: 6px;
+          font-size: 10px;
+        }
+
+        @media (max-width: 1024px) {
+          .nf-preview-shell {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media print {
+          @page {
+            size: 80mm auto;
+            margin: 0;
+          }
+
+          html,
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            width: 80mm;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
+          body * {
+            visibility: hidden;
+          }
+
+          .nf-print-area,
+          .nf-print-area * {
+            visibility: visible;
+          }
+
+          .nf-bill-page {
+            padding: 0 !important;
+            background: #ffffff !important;
+          }
+
+          .nf-screen-toolbar,
+          .nf-side-panel {
+            display: none !important;
+          }
+
+          .nf-preview-shell,
+          .nf-receipt-stage {
+            display: block !important;
+            max-width: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: #ffffff !important;
+            border: none !important;
+            min-height: auto !important;
+            box-shadow: none !important;
+          }
+
+          .nf-print-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 80mm;
+          }
+
+          .nf-receipt {
+            width: 80mm;
+            border-radius: 0;
+            box-shadow: none;
+            padding: 6mm 4mm 7mm;
+            margin: 0;
+          }
+        }
+      `}</style>
+
+      <div className="nf-bill-page">
+        <div className="nf-screen-toolbar">
+          <div className="nf-toolbar-left">
+            <button className="nf-back-btn" onClick={() => navigate("/bills")}> 
+              <ArrowLeft size={17} />
+              Back to Bills
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Bill Details</h1>
+              <p className="text-sm text-slate-600">80mm thermal receipt preview and print</p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={handlePrintBill}
-            className="flex items-center px-4 py-2 bg-slate-100 text-slate-700 rounded hover:bg-slate-200"
-          >
-            <Download size={16} className="mr-2" />
-            Print
-          </button>
-          <button
-            onClick={handleUpdateBill}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            <Edit size={16} className="mr-2" />
-            Update
-          </button>
-          <button
-            onClick={handleDeleteBill}
-            disabled={deleteLoading}
-            className="flex items-center px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-          >
-            {deleteLoading ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-            ) : (
-              <Trash2 size={16} className="mr-2" />
-            )}
-            Delete
-          </button>
-        </div>
-      </div>
-
-      {/* Bill Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Bill Information</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Invoice Number:</span>
-              <span className="font-medium">{bill.invoice_number}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Date:</span>
-              <span className="font-medium">{new Date(bill.sale_date).toLocaleDateString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Customer:</span>
-              <span className="font-medium">{bill.customer?.full_name || "Walk-in Customer"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Payment Status:</span>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                bill.payment_status === 'paid'
-                  ? 'bg-green-100 text-green-800'
-                  : bill.payment_status === 'partial'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-red-100 text-red-800'
-              }`}>
-                {bill.payment_status}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Payment Summary</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Total Amount:</span>
-              <span className="font-medium">{formatCurrency(bill.total_amount)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Paid Amount:</span>
-              <span className="font-medium text-green-600">{formatCurrency(bill.paid_amount)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Balance Due:</span>
-              <span className={`font-medium ${Number(bill.balance_due) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                {formatCurrency(bill.balance_due)}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Items Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200">
-        <div className="px-6 py-4 border-b border-slate-200">
-          <h3 className="text-lg font-semibold text-slate-900">Items</h3>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Item
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Quantity
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Unit Price
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
-              {bill.sale_items && bill.sale_items.length > 0 ? (
-                bill.sale_items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
-                      {item.item_name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                      {item.quantity}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                      {formatCurrency(item.unit_price)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
-                      {formatCurrency(item.line_total)}
-                    </td>
-                  </tr>
-                ))
+          <div className="flex flex-wrap items-center gap-2">
+            <button className="nf-action-btn nf-action-btn-primary" onClick={handlePrint}>
+              <Printer size={16} />
+              Print Receipt
+            </button>
+            <button className="nf-action-btn" onClick={handleUpdateBill}>
+              <Edit size={16} />
+              Update
+            </button>
+            <button
+              className="nf-action-btn nf-action-btn-danger"
+              onClick={handleDeleteBill}
+              disabled={deleteLoading}
+            >
+              {deleteLoading ? (
+                <>
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
+                  Deleting...
+                </>
               ) : (
-                <tr>
-                  <td colSpan="4" className="px-6 py-4 text-center text-slate-500">
-                    No items found for this bill
-                  </td>
-                </tr>
+                <>
+                  <Trash2 size={16} />
+                  Delete
+                </>
               )}
-            </tbody>
-          </table>
+            </button>
+          </div>
+        </div>
+
+        <div className="nf-preview-shell">
+          <div className="nf-receipt-stage nf-print-area">
+            <div className="nf-receipt">
+              <div className="nf-center">
+                <div className="nf-brand-mark">NF</div>
+                <div className="nf-store-name">{BUSINESS.name}</div>
+                <div className="nf-store-subtitle">{BUSINESS.subtitle}</div>
+                <div className="nf-store-meta">{BUSINESS.address}</div>
+                <div className="nf-store-meta">{BUSINESS.phone1} &nbsp; | &nbsp; {BUSINESS.phone2}</div>
+                <div className="nf-receipt-title">Sale Receipt</div>
+              </div>
+
+              <div className="nf-section">
+                <div className="nf-meta-row">
+                  <span className="nf-meta-label">Receipt No:</span>
+                  <span className="nf-meta-value">{bill.invoice_number || `BILL-${bill.id}`}</span>
+                </div>
+                <div className="nf-meta-row">
+                  <span className="nf-meta-label">Date:</span>
+                  <span className="nf-meta-value">{formatReceiptDate(bill.sale_date)}</span>
+                </div>
+                <div className="nf-meta-row">
+                  <span className="nf-meta-label">Customer:</span>
+                  <span className="nf-meta-value">{customerName}</span>
+                </div>
+                <div className="nf-meta-row">
+                  <span className="nf-meta-label">Status:</span>
+                  <span className="nf-meta-value" style={{ textTransform: "capitalize" }}>
+                    {bill.payment_status || "unpaid"}
+                  </span>
+                </div>
+                {bill.payment_method ? (
+                  <div className="nf-meta-row">
+                    <span className="nf-meta-label">Method:</span>
+                    <span className="nf-meta-value" style={{ textTransform: "capitalize" }}>
+                      {String(bill.payment_method).replace(/_/g, " ")}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+
+              <table className="nf-items-table">
+                <thead>
+                  <tr>
+                    <th className="nf-col-item">Item</th>
+                    <th className="nf-col-qty">Qty</th>
+                    <th className="nf-col-rate">Price</th>
+                    <th className="nf-col-total">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bill.sale_items?.length ? (
+                    bill.sale_items.map((item) => (
+                      <tr key={item.id}>
+                        <td className="nf-col-item">
+                          <span className="nf-item-name">{item.item_name}</span>
+                        </td>
+                        <td className="nf-col-qty">{toNumber(item.quantity).toFixed(2)}</td>
+                        <td className="nf-col-rate">{formatAmount(item.unit_price)}</td>
+                        <td className="nf-col-total">{formatAmount(item.line_total)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="4" className="py-3 text-center">
+                        No items found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+
+              <div className="nf-summary-box">
+                <ReceiptRow label="Subtotal:" value={formatAmount(subtotal)} />
+                {discount > 0 ? <ReceiptRow label="Discount:" value={formatAmount(discount)} /> : null}
+                {tax > 0 ? <ReceiptRow label="Tax:" value={formatAmount(tax)} /> : null}
+                <ReceiptRow label="Paid:" value={formatAmount(paid)} />
+                <ReceiptRow label="Balance:" value={formatAmount(balance)} strong />
+                <ReceiptRow label="Total:" value={formatAmount(total)} strong />
+              </div>
+
+              <div className="nf-totals-strip">
+                <div className="nf-chip">Items: {bill.sale_items?.length || 0}</div>
+                <div className="nf-chip">Qty: {formatAmount(totalQty)}</div>
+              </div>
+
+              <BarcodeBlock />
+
+              <div className="nf-footer-note">{BUSINESS.thankYou}</div>
+              <div className="nf-mini-logo">{BUSINESS.name}</div>
+              <div className="nf-software-line">{BUSINESS.footer}</div>
+
+              {bill.notes ? <div className="nf-notes">Note: {bill.notes}</div> : null}
+            </div>
+          </div>
+
+          <div className="nf-side-panel nf-side-grid">
+            <div className="nf-side-card">
+              <div className="nf-side-title">Bill Information</div>
+              <div className="nf-side-row">
+                <span className="nf-side-label">Invoice Number</span>
+                <span className="nf-side-value">{bill.invoice_number || `BILL-${bill.id}`}</span>
+              </div>
+              <div className="nf-side-row">
+                <span className="nf-side-label">Customer</span>
+                <span className="nf-side-value">{customerName}</span>
+              </div>
+              <div className="nf-side-row">
+                <span className="nf-side-label">Date & Time</span>
+                <span className="nf-side-value">{formatReceiptDate(bill.sale_date)}</span>
+              </div>
+              <div className="nf-side-row">
+                <span className="nf-side-label">Payment Status</span>
+                <span className="nf-side-value" style={{ textTransform: "capitalize" }}>
+                  {bill.payment_status || "unpaid"}
+                </span>
+              </div>
+              <div className="nf-side-row">
+                <span className="nf-side-label">Payment Method</span>
+                <span className="nf-side-value" style={{ textTransform: "capitalize" }}>
+                  {bill.payment_method ? String(bill.payment_method).replace(/_/g, " ") : "-"}
+                </span>
+              </div>
+            </div>
+
+            <div className="nf-side-card">
+              <div className="nf-side-title">Payment Summary</div>
+              <div className="nf-side-row">
+                <span className="nf-side-label">Subtotal</span>
+                <span className="nf-side-value">Rs {formatAmount(subtotal)}</span>
+              </div>
+              <div className="nf-side-row">
+                <span className="nf-side-label">Discount</span>
+                <span className="nf-side-value">Rs {formatAmount(discount)}</span>
+              </div>
+              <div className="nf-side-row">
+                <span className="nf-side-label">Tax</span>
+                <span className="nf-side-value">Rs {formatAmount(tax)}</span>
+              </div>
+              <div className="nf-side-row">
+                <span className="nf-side-label">Paid</span>
+                <span className="nf-side-value">Rs {formatAmount(paid)}</span>
+              </div>
+              <div className="nf-side-row">
+                <span className="nf-side-label">Balance</span>
+                <span className="nf-side-value">Rs {formatAmount(balance)}</span>
+              </div>
+              <div className="nf-side-row">
+                <span className="nf-side-label">Grand Total</span>
+                <span className="nf-side-value">Rs {formatAmount(total)}</span>
+              </div>
+            </div>
+
+           
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
