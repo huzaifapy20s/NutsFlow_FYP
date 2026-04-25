@@ -1,149 +1,453 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import {
+  BadgePercent,
+  BarChart3,
+  Calculator,
+  CircleDollarSign,
+  FileText,
+  ShoppingBag,
+  TrendingDown,
+  TrendingUp,
+  WalletCards,
+} from "lucide-react";
 import { fetchIncomeStatement } from "../../features/reports/reportsSlice";
 import { formatCurrency } from "../../utils/formatters";
-import { TrendingUp, TrendingDown, ShoppingBag, DollarSign } from "lucide-react";
 
-function LineItem({ label, value, indent = false, bold = false, positive = true, separator = false }) {
-  const numVal = parseFloat(value || 0);
+const accentColor = "#ffcf83";
+
+function toNumber(value) {
+  const numericValue = Number(value || 0);
+  return Number.isFinite(numericValue) ? numericValue : 0;
+}
+
+function ReportMetric({ title, value, helper, icon: Icon, tone = "neutral" }) {
+  const toneClasses = {
+    positive: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    negative: "border-rose-200 bg-rose-50 text-rose-700",
+    accent: "border-[#ffcf83] bg-[#ffcf83]/30 text-slate-950",
+    neutral: "border-slate-200 bg-slate-50 text-slate-700",
+  };
+
   return (
-    <>
-      {separator && <tr><td colSpan={2} className="py-2"><hr className="border-slate-200" /></td></tr>}
-      <tr className={`${bold ? "font-bold text-slate-900" : "text-slate-700"}`}>
-        <td className={`py-2 ${indent ? "pl-8" : "pl-2"} text-sm`}>{label}</td>
-        <td className={`py-2 pr-2 text-right text-sm ${bold ? "text-slate-900" : numVal < 0 ? "text-red-600" : positive ? "text-green-700" : "text-red-600"}`}>
-          {formatCurrency(numVal)}
-        </td>
-      </tr>
-    </>
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            {title}
+          </p>
+          <p className="mt-3 text-2xl font-bold tracking-tight text-slate-950">
+            {value}
+          </p>
+          {helper ? (
+            <p className="mt-2 text-sm leading-5 text-slate-500">{helper}</p>
+          ) : null}
+        </div>
+        <div
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${
+            toneClasses[tone] || toneClasses.neutral
+          }`}
+        >
+          <Icon size={20} strokeWidth={2} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatementRow({
+  label,
+  value,
+  helper,
+  strong = false,
+  highlight = false,
+  muted = false,
+  negative = false,
+}) {
+  return (
+    <div
+      className={`flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between ${
+        highlight ? "bg-[#ffcf83]/15" : "bg-white"
+      }`}
+    >
+      <div>
+        <p
+          className={`text-sm ${
+            strong
+              ? "font-bold text-slate-950"
+              : muted
+                ? "font-semibold text-slate-600"
+                : "font-semibold text-slate-800"
+          }`}
+        >
+          {label}
+        </p>
+        {helper ? (
+          <p className="mt-1 text-xs text-slate-500">{helper}</p>
+        ) : null}
+      </div>
+      <p
+        className={`text-right ${
+          strong
+            ? "text-lg font-bold text-slate-950"
+            : negative
+              ? "text-sm font-semibold text-rose-700"
+              : "text-sm font-semibold text-slate-900"
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function SectionLabel({ children }) {
+  return (
+    <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
+      <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+        {children}
+      </p>
+    </div>
+  );
+}
+
+function BreakdownBar({ label, value, maxValue, tone = "slate" }) {
+  const numericValue = Math.abs(toNumber(value));
+  const width = Math.min(
+    100,
+    Math.round((numericValue / Math.max(maxValue, 1)) * 100),
+  );
+  const barTone = {
+    emerald: "bg-emerald-500",
+    rose: "bg-rose-500",
+    amber: "bg-[#ffcf83]",
+    slate: "bg-slate-900",
+  }[tone];
+
+  return (
+    <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm font-semibold text-slate-800">{label}</span>
+        <span className="text-sm font-bold text-slate-950">
+          {formatCurrency(value)}
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className={`h-full rounded-full ${barTone}`}
+          style={{ width: `${width}%` }}
+        />
+      </div>
+    </div>
   );
 }
 
 export default function IncomeStatementPage() {
   const dispatch = useDispatch();
-  const { incomeStatement, loading, error } = useSelector((state) => state.reports);
+  const { incomeStatement, loading, error } = useSelector(
+    (state) => state.reports,
+  );
 
   useEffect(() => {
     dispatch(fetchIncomeStatement());
   }, [dispatch]);
 
   const data = incomeStatement;
-  const grossProfit = parseFloat(data?.gross_profit || 0);
-  const netProfit = parseFloat(data?.net_profit || 0);
+  const totalRevenue = toNumber(data?.total_revenue);
+  const totalCogs = toNumber(data?.total_cogs);
+  const totalExpenses = toNumber(data?.total_expenses);
+  const grossProfit = toNumber(data?.gross_profit);
+  const netProfit = toNumber(data?.net_profit);
+  const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+  const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+  const expenseRatio =
+    totalRevenue > 0 ? (totalExpenses / totalRevenue) * 100 : 0;
+  const maxBreakdownValue = Math.max(
+    totalRevenue,
+    totalCogs,
+    totalExpenses,
+    Math.abs(netProfit),
+    1,
+  );
+  const isProfitable = netProfit >= 0;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="page-title">Income Statement</h1>
-        <p className="page-subtitle">Revenue, cost of goods sold, expenses, and net profit summary.</p>
-      </div>
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div
+          className="h-1.5 w-full"
+          style={{ backgroundColor: accentColor }}
+        />
+        <div className="flex flex-col gap-5 p-6 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: accentColor }}
+              />
+              Financial Reporting
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-950">
+              Income Statement
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+              Revenue, cost of goods sold, operating expenses, and final net
+              profit in a clean formal statement.
+            </p>
+          </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {loading && <p className="text-sm text-slate-500">Loading...</p>}
-
-      {data && !loading && (
-        <>
-          {/* KPI Cards */}
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="card flex items-center gap-4">
-              <div className="rounded-xl bg-green-100 p-3">
-                <TrendingUp size={20} className="text-green-600" />
+          <div className="rounded-2xl border border-slate-200 bg-slate-950 px-5 py-4 text-white shadow-sm sm:min-w-[260px]">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+              Statement Result
+            </p>
+            <div className="mt-2 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 bg-white/10 text-[#ffcf83]">
+                {isProfitable ? (
+                  <TrendingUp size={18} />
+                ) : (
+                  <TrendingDown size={18} />
+                )}
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Total Revenue</p>
-                <p className="text-lg font-bold text-green-700">{formatCurrency(data.total_revenue)}</p>
-              </div>
-            </div>
-            <div className="card flex items-center gap-4">
-              <div className="rounded-xl bg-orange-100 p-3">
-                <ShoppingBag size={20} className="text-orange-600" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Cost of Goods Sold</p>
-                <p className="text-lg font-bold text-orange-700">{formatCurrency(data.total_cogs)}</p>
-              </div>
-            </div>
-            <div className="card flex items-center gap-4">
-              <div className="rounded-xl bg-red-100 p-3">
-                <TrendingDown size={20} className="text-red-600" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Total Expenses</p>
-                <p className="text-lg font-bold text-red-600">{formatCurrency(data.total_expenses)}</p>
-              </div>
-            </div>
-            <div className={`card flex items-center gap-4 ${netProfit >= 0 ? "border-l-4 border-l-green-500 bg-green-50" : "border-l-4 border-l-red-500 bg-red-50"}`}>
-              <div className={`rounded-xl p-3 ${netProfit >= 0 ? "bg-green-100" : "bg-red-100"}`}>
-                <DollarSign size={20} className={netProfit >= 0 ? "text-green-700" : "text-red-700"} />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Net Profit</p>
-                <p className={`text-lg font-bold ${netProfit >= 0 ? "text-green-700" : "text-red-600"}`}>
-                  {formatCurrency(data.net_profit)}
+                <p className="text-lg font-bold text-white">
+                  {formatCurrency(netProfit)}
+                </p>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  {isProfitable ? "Net profit" : "Net loss"}
                 </p>
               </div>
             </div>
           </div>
+        </div>
+      </section>
 
-          {/* Formal Statement */}
-          <div className="card max-w-2xl">
-            <h2 className="mb-1 text-base font-bold text-slate-900">Formal Income Statement</h2>
-            <p className="mb-4 text-xs text-slate-500">All figures from inception to date (all completed sales)</p>
+      {error ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-medium text-rose-700">
+          {error}
+        </div>
+      ) : null}
 
-            <table className="w-full">
-              <thead>
-                <tr className="border-b-2 border-slate-900">
-                  <th className="py-2 pl-2 text-left text-sm font-bold text-slate-900">Description</th>
-                  <th className="py-2 pr-2 text-right text-sm font-bold text-slate-900">Amount (PKR)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="text-slate-500">
-                  <td colSpan={2} className="pt-3 pb-1 pl-2 text-xs font-semibold uppercase tracking-wider">Revenue</td>
-                </tr>
-                <LineItem label="Net Sales Revenue" value={data.total_revenue} indent positive />
+      {loading ? (
+        <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
+          <p className="mt-4 text-sm font-semibold text-slate-600">
+            Loading income statement...
+          </p>
+        </div>
+      ) : data ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <ReportMetric
+              title="Total Revenue"
+              value={formatCurrency(totalRevenue)}
+              helper="Net sales revenue"
+              icon={CircleDollarSign}
+              tone="accent"
+            />
+            <ReportMetric
+              title="COGS"
+              value={formatCurrency(totalCogs)}
+              helper="Direct cost of goods sold"
+              icon={ShoppingBag}
+            />
+            <ReportMetric
+              title="Expenses"
+              value={formatCurrency(totalExpenses)}
+              helper={`${expenseRatio.toFixed(1)}% of revenue`}
+              icon={WalletCards}
+            />
+            <ReportMetric
+              title={isProfitable ? "Net Profit" : "Net Loss"}
+              value={formatCurrency(netProfit)}
+              helper={`${netMargin.toFixed(1)}% net margin`}
+              icon={isProfitable ? TrendingUp : TrendingDown}
+              tone={isProfitable ? "positive" : "negative"}
+            />
+          </div>
 
-                <tr className="text-slate-500">
-                  <td colSpan={2} className="pt-3 pb-1 pl-2 text-xs font-semibold uppercase tracking-wider">Cost of Goods Sold</td>
-                </tr>
-                <LineItem label="Cost of Goods Sold (COGS)" value={data.total_cogs} indent positive={false} />
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex flex-col gap-3 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-950">
+                    Formal Income Statement
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    All figures from inception to date based on completed sales.
+                  </p>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: accentColor }}
+                  />
+                  Live statement
+                </div>
+              </div>
 
-                <LineItem
+              <div className="divide-y divide-slate-100">
+                <SectionLabel>Revenue</SectionLabel>
+                <StatementRow
+                  label="Net Sales Revenue"
+                  helper="Total revenue generated from completed sales."
+                  value={formatCurrency(totalRevenue)}
+                />
+
+                <SectionLabel>Cost of Goods Sold</SectionLabel>
+                <StatementRow
+                  label="Cost of Goods Sold (COGS)"
+                  helper="Inventory cost attached to completed sales."
+                  value={`-${formatCurrency(totalCogs)}`}
+                  negative
+                />
+                <StatementRow
                   label="Gross Profit"
-                  value={data.gross_profit}
-                  bold
-                  separator
-                  positive={grossProfit >= 0}
+                  helper="Revenue after direct product costs."
+                  value={formatCurrency(grossProfit)}
+                  strong
+                  highlight
                 />
 
-                <tr className="text-slate-500">
-                  <td colSpan={2} className="pt-3 pb-1 pl-2 text-xs font-semibold uppercase tracking-wider">Operating Expenses</td>
-                </tr>
-                <LineItem label="Total Expenses" value={data.total_expenses} indent positive={false} />
-
-                <LineItem
-                  label={netProfit >= 0 ? "Net Profit" : "Net Loss"}
-                  value={data.net_profit}
-                  bold
-                  separator
-                  positive={netProfit >= 0}
+                <SectionLabel>Operating Expenses</SectionLabel>
+                <StatementRow
+                  label="Total Expenses"
+                  helper="Business expenses recorded in the system."
+                  value={`-${formatCurrency(totalExpenses)}`}
+                  negative
                 />
-              </tbody>
-            </table>
 
-            <div className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-500">
-              <span className="font-medium text-slate-700">Gross Margin: </span>
-              {parseFloat(data.total_revenue) > 0
-                ? ((grossProfit / parseFloat(data.total_revenue)) * 100).toFixed(1) + "%"
-                : "N/A"}
-              &nbsp;&nbsp;|&nbsp;&nbsp;
-              <span className="font-medium text-slate-700">Net Margin: </span>
-              {parseFloat(data.total_revenue) > 0
-                ? ((netProfit / parseFloat(data.total_revenue)) * 100).toFixed(1) + "%"
-                : "N/A"}
-            </div>
+                <StatementRow
+                  label={isProfitable ? "Net Profit" : "Net Loss"}
+                  helper="Final result after COGS and operating expenses."
+                  value={formatCurrency(netProfit)}
+                  strong
+                  highlight
+                />
+              </div>
+            </section>
+
+            <aside className="space-y-6">
+              <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div
+                  className="h-1 w-full"
+                  style={{ backgroundColor: accentColor }}
+                />
+                <div className="p-5">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#ffcf83] bg-[#ffcf83]/30 text-slate-950">
+                      <BadgePercent size={18} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Profitability
+                      </p>
+                      <h3 className="text-base font-bold text-slate-950">
+                        Margin Overview
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                        Gross Margin
+                      </p>
+                      <p className="mt-1 text-xl font-bold text-slate-950">
+                        {grossMargin.toFixed(1)}%
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                        Net Margin
+                      </p>
+                      <p className="mt-1 text-xl font-bold text-slate-950">
+                        {netMargin.toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700">
+                    <BarChart3 size={18} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Breakdown
+                    </p>
+                    <h3 className="text-base font-bold text-slate-950">
+                      Statement Comparison
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <BreakdownBar
+                    label="Revenue"
+                    value={totalRevenue}
+                    maxValue={maxBreakdownValue}
+                    tone="emerald"
+                  />
+                  <BreakdownBar
+                    label="COGS"
+                    value={totalCogs}
+                    maxValue={maxBreakdownValue}
+                    tone="amber"
+                  />
+                  <BreakdownBar
+                    label="Expenses"
+                    value={totalExpenses}
+                    maxValue={maxBreakdownValue}
+                    tone="rose"
+                  />
+                  <BreakdownBar
+                    label="Net Result"
+                    value={netProfit}
+                    maxValue={maxBreakdownValue}
+                    tone="slate"
+                  />
+                </div>
+              </section>
+
+              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700">
+                    <Calculator size={18} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Formula
+                    </p>
+                    <h3 className="text-base font-bold text-slate-950">
+                      Net Result
+                    </h3>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  Revenue - COGS - Expenses ={" "}
+                  <span className="font-bold text-slate-950">
+                    {formatCurrency(netProfit)}
+                  </span>
+                </div>
+              </section>
+            </aside>
           </div>
         </>
+      ) : (
+        <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center shadow-sm">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-[#ffcf83] bg-[#ffcf83]/30 text-slate-950">
+            <FileText size={22} />
+          </div>
+          <h3 className="mt-4 text-base font-bold text-slate-950">
+            No income statement data found
+          </h3>
+          <p className="mt-2 text-sm text-slate-500">
+            Once sales, COGS, and expenses are recorded, the statement will
+            appear here.
+          </p>
+        </div>
       )}
     </div>
   );

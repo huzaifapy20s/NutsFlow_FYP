@@ -204,41 +204,85 @@ export default function BillDetailView() {
         }
 
         .nf-screen-toolbar {
-          max-width: 1100px;
+          max-width: 1160px;
           margin: 0 auto 20px;
+          overflow: hidden;
+          border: 1px solid #e2e8f0;
+          border-radius: 24px;
+          background: #ffffff;
+          box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+        }
+
+        .nf-screen-toolbar::before {
+          content: "";
+          display: block;
+          height: 6px;
+          width: 100%;
+          background: #ffcf83;
+        }
+
+        .nf-screen-toolbar-inner {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 16px;
+          gap: 20px;
           flex-wrap: wrap;
+          padding: 22px 24px;
         }
 
         .nf-toolbar-left {
           display: flex;
-          align-items: center;
-          gap: 12px;
+          align-items: flex-start;
+          gap: 16px;
           flex-wrap: wrap;
+        }
+
+        .nf-toolbar-copy {
+          min-width: 240px;
+        }
+
+        .nf-toolbar-kicker {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.14em;
+          color: #64748b;
+          text-transform: uppercase;
+        }
+
+        .nf-toolbar-kicker::before {
+          content: "";
+          width: 8px;
+          height: 8px;
+          border-radius: 9999px;
+          background: #ffcf83;
         }
 
         .nf-back-btn,
         .nf-action-btn {
-          border: 1px solid #cbd5e1;
+          border: 1px solid #dbe4ee;
           background: #ffffff;
           color: #0f172a;
-          border-radius: 12px;
+          border-radius: 14px;
           padding: 10px 14px;
           font-size: 14px;
-          font-weight: 600;
+          font-weight: 700;
           display: inline-flex;
           align-items: center;
           gap: 8px;
           cursor: pointer;
           transition: all 0.2s ease;
+          box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
         }
 
         .nf-back-btn:hover,
         .nf-action-btn:hover {
-          background: #f1f5f9;
+          border-color: #cbd5e1;
+          background: #f8fafc;
+          transform: translateY(-1px);
         }
 
         .nf-action-btn-primary {
@@ -252,39 +296,73 @@ export default function BillDetailView() {
         }
 
         .nf-action-btn-danger {
-          background: #dc2626;
-          color: #fff;
-          border-color: #dc2626;
+          background: #ffffff;
+          color: #dc2626;
+          border-color: #fecaca;
         }
 
         .nf-action-btn-danger:hover {
-          background: #b91c1c;
+          background: #fff1f2;
+          border-color: #fca5a5;
+        }
+
+        .nf-status-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          width: fit-content;
+          border: 1px solid #e2e8f0;
+          border-radius: 9999px;
+          background: #f8fafc;
+          padding: 6px 10px;
+          color: #475569;
+          font-size: 12px;
+          font-weight: 700;
+          text-transform: capitalize;
+        }
+
+        .nf-status-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 9999px;
+          background: #ffcf83;
         }
 
         .nf-preview-shell {
-          max-width: 1100px;
+          max-width: 1160px;
           margin: 0 auto;
           display: grid;
-          grid-template-columns: minmax(300px, 420px) minmax(260px, 1fr);
+          grid-template-columns: minmax(300px, 420px) minmax(280px, 1fr);
           gap: 24px;
           align-items: start;
         }
 
         .nf-receipt-stage {
-          background: linear-gradient(180deg, #e2e8f0 0%, #f8fafc 100%);
-          border: 1px solid #dbe4ee;
-          border-radius: 20px;
+          background: linear-gradient(180deg, #f1f5f9 0%, #ffffff 100%);
+          border: 1px solid #e2e8f0;
+          border-radius: 24px;
           padding: 24px;
           display: flex;
           justify-content: center;
           min-height: 820px;
+          box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
         }
 
         .nf-side-card {
           background: #ffffff;
           border: 1px solid #e2e8f0;
-          border-radius: 20px;
-          box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+          border-radius: 24px;
+          box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+          overflow: hidden;
+        }
+
+        .nf-side-card-accent {
+          height: 4px;
+          width: 100%;
+          background: #ffcf83;
+        }
+
+        .nf-side-card-body {
           padding: 20px;
         }
 
@@ -294,18 +372,25 @@ export default function BillDetailView() {
         }
 
         .nf-side-title {
-          font-size: 18px;
-          font-weight: 700;
+          font-size: 16px;
+          font-weight: 800;
           color: #0f172a;
-          margin-bottom: 10px;
+          margin-bottom: 12px;
+        }
+
+        .nf-side-muted {
+          font-size: 12px;
+          color: #64748b;
+          margin-top: -6px;
+          margin-bottom: 12px;
         }
 
         .nf-side-row {
           display: flex;
           justify-content: space-between;
           gap: 12px;
-          padding: 8px 0;
-          border-bottom: 1px dashed #e2e8f0;
+          padding: 10px 0;
+          border-bottom: 1px solid #f1f5f9;
           font-size: 14px;
         }
 
@@ -315,12 +400,30 @@ export default function BillDetailView() {
 
         .nf-side-label {
           color: #64748b;
+          font-weight: 600;
         }
 
         .nf-side-value {
           color: #0f172a;
-          font-weight: 600;
+          font-weight: 700;
           text-align: right;
+        }
+
+        .nf-side-total {
+          margin-top: 10px;
+          border: 1px solid #e2e8f0;
+          border-radius: 16px;
+          background: #f8fafc;
+          padding: 12px 14px;
+        }
+
+        .nf-side-total .nf-side-row {
+          padding: 4px 0;
+          border-bottom: none;
+        }
+
+        .nf-side-total .nf-side-value {
+          font-size: 18px;
         }
 
         .nf-receipt {
@@ -607,18 +710,24 @@ export default function BillDetailView() {
 
       <div className="nf-bill-page">
         <div className="nf-screen-toolbar">
-          <div className="nf-toolbar-left">
-            <button className="nf-back-btn" onClick={() => navigate("/bills")}> 
-              <ArrowLeft size={17} />
-              Back to Bills
-            </button>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Bill Details</h1>
-              <p className="text-sm text-slate-600">80mm thermal receipt preview and print</p>
+          <div className="nf-screen-toolbar-inner">
+            <div className="nf-toolbar-left">
+              <button className="nf-back-btn" onClick={() => navigate("/bills")}>
+                <ArrowLeft size={17} />
+                Back to Bills
+              </button>
+              <div className="nf-toolbar-copy">
+                <div className="nf-toolbar-kicker">Bill Preview</div>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-950">Bill Details</h1>
+                <p className="mt-1 text-sm text-slate-500">Review bill information and print the saved receipt.</p>
+                <div className="nf-status-pill mt-3">
+                  <span className="nf-status-dot" />
+                  {bill.payment_status || "unpaid"}
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
             <button className="nf-action-btn nf-action-btn-primary" onClick={handlePrint}>
               <Printer size={16} />
               Print Receipt
@@ -644,6 +753,7 @@ export default function BillDetailView() {
                 </>
               )}
             </button>
+            </div>
           </div>
         </div>
 
@@ -745,62 +855,70 @@ export default function BillDetailView() {
 
           <div className="nf-side-panel nf-side-grid">
             <div className="nf-side-card">
-              <div className="nf-side-title">Bill Information</div>
-              <div className="nf-side-row">
-                <span className="nf-side-label">Invoice Number</span>
-                <span className="nf-side-value">{bill.invoice_number || `BILL-${bill.id}`}</span>
-              </div>
-              <div className="nf-side-row">
-                <span className="nf-side-label">Customer</span>
-                <span className="nf-side-value">{customerName}</span>
-              </div>
-              <div className="nf-side-row">
-                <span className="nf-side-label">Date & Time</span>
-                <span className="nf-side-value">{formatReceiptDate(bill.sale_date)}</span>
-              </div>
-              <div className="nf-side-row">
-                <span className="nf-side-label">Payment Status</span>
-                <span className="nf-side-value" style={{ textTransform: "capitalize" }}>
-                  {bill.payment_status || "unpaid"}
-                </span>
-              </div>
-              <div className="nf-side-row">
-                <span className="nf-side-label">Payment Method</span>
-                <span className="nf-side-value" style={{ textTransform: "capitalize" }}>
-                  {bill.payment_method ? String(bill.payment_method).replace(/_/g, " ") : "-"}
-                </span>
+              <div className="nf-side-card-accent" />
+              <div className="nf-side-card-body">
+                <div className="nf-side-title">Bill Information</div>
+                <p className="nf-side-muted">Saved sale and customer information.</p>
+                <div className="nf-side-row">
+                  <span className="nf-side-label">Invoice Number</span>
+                  <span className="nf-side-value">{bill.invoice_number || `BILL-${bill.id}`}</span>
+                </div>
+                <div className="nf-side-row">
+                  <span className="nf-side-label">Customer</span>
+                  <span className="nf-side-value">{customerName}</span>
+                </div>
+                <div className="nf-side-row">
+                  <span className="nf-side-label">Date & Time</span>
+                  <span className="nf-side-value">{formatReceiptDate(bill.sale_date)}</span>
+                </div>
+                <div className="nf-side-row">
+                  <span className="nf-side-label">Payment Status</span>
+                  <span className="nf-side-value" style={{ textTransform: "capitalize" }}>
+                    {bill.payment_status || "unpaid"}
+                  </span>
+                </div>
+                <div className="nf-side-row">
+                  <span className="nf-side-label">Payment Method</span>
+                  <span className="nf-side-value" style={{ textTransform: "capitalize" }}>
+                    {bill.payment_method ? String(bill.payment_method).replace(/_/g, " ") : "-"}
+                  </span>
+                </div>
               </div>
             </div>
 
             <div className="nf-side-card">
-              <div className="nf-side-title">Payment Summary</div>
-              <div className="nf-side-row">
-                <span className="nf-side-label">Subtotal</span>
-                <span className="nf-side-value">Rs {formatAmount(subtotal)}</span>
-              </div>
-              <div className="nf-side-row">
-                <span className="nf-side-label">Discount</span>
-                <span className="nf-side-value">Rs {formatAmount(discount)}</span>
-              </div>
-              <div className="nf-side-row">
-                <span className="nf-side-label">Tax</span>
-                <span className="nf-side-value">Rs {formatAmount(tax)}</span>
-              </div>
-              <div className="nf-side-row">
-                <span className="nf-side-label">Paid</span>
-                <span className="nf-side-value">Rs {formatAmount(paid)}</span>
-              </div>
-              <div className="nf-side-row">
-                <span className="nf-side-label">Balance</span>
-                <span className="nf-side-value">Rs {formatAmount(balance)}</span>
-              </div>
-              <div className="nf-side-row">
-                <span className="nf-side-label">Grand Total</span>
-                <span className="nf-side-value">Rs {formatAmount(total)}</span>
+              <div className="nf-side-card-accent" />
+              <div className="nf-side-card-body">
+                <div className="nf-side-title">Payment Summary</div>
+                <p className="nf-side-muted">Totals are unchanged from the saved bill.</p>
+                <div className="nf-side-row">
+                  <span className="nf-side-label">Subtotal</span>
+                  <span className="nf-side-value">Rs {formatAmount(subtotal)}</span>
+                </div>
+                <div className="nf-side-row">
+                  <span className="nf-side-label">Discount</span>
+                  <span className="nf-side-value">Rs {formatAmount(discount)}</span>
+                </div>
+                <div className="nf-side-row">
+                  <span className="nf-side-label">Tax</span>
+                  <span className="nf-side-value">Rs {formatAmount(tax)}</span>
+                </div>
+                <div className="nf-side-row">
+                  <span className="nf-side-label">Paid</span>
+                  <span className="nf-side-value">Rs {formatAmount(paid)}</span>
+                </div>
+                <div className="nf-side-row">
+                  <span className="nf-side-label">Balance</span>
+                  <span className="nf-side-value">Rs {formatAmount(balance)}</span>
+                </div>
+                <div className="nf-side-total">
+                  <div className="nf-side-row">
+                    <span className="nf-side-label">Grand Total</span>
+                    <span className="nf-side-value">Rs {formatAmount(total)}</span>
+                  </div>
+                </div>
               </div>
             </div>
-
-           
           </div>
         </div>
       </div>
