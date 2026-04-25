@@ -1,5 +1,6 @@
 import { BarChart3, Box, LayoutDashboard, Receipt, ShoppingCart, Store, Users, Wallet, Landmark, FileText, TrendingUp, Star } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
+import logo from "../../../logo.png";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -24,9 +25,15 @@ export default function Sidebar() {
   return (
     <>
       <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white lg:block">
-        <div className="p-6">
-          <h1 className="text-xl font-bold">Nuts Flow</h1>
+        <div className="flex items-center p-6">
+           <div className="h-20 w-20 p-2">
+          <img src={logo} alt="Nuts Flow Logo" />
+         </div>
+         <div>
+           <h1 className="text-xl font-bold">Nuts Flow</h1>
           <p className="mt-1 text-sm text-slate-500">Your Business Partner</p>
+         </div>
+        
         </div>
 
         <nav className="space-y-1 px-4 pb-6">
