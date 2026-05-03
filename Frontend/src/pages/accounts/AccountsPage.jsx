@@ -1,12 +1,14 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowUpRight,
   BookOpen,
   Landmark,
+  Search,
   Truck,
   UsersRound,
+  X,
 } from "lucide-react";
 import {
   fetchChartOfAccounts,
@@ -103,8 +105,25 @@ function AccountSection({
   columns,
   emptyText,
   icon: Icon,
-  countLabel,
+  searchPlaceholder,
+  searchFields = [],
 }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredRows = useMemo(() => {
+    if (!normalizedSearch) return rows;
+
+    return rows.filter((row) => {
+      const searchableText = searchFields
+        .map((field) => (typeof field === "function" ? field(row) : row[field]))
+        .filter((value) => value !== null && value !== undefined)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(normalizedSearch);
+    });
+  }, [rows, searchFields, normalizedSearch]);
+
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
@@ -117,12 +136,38 @@ function AccountSection({
             <p className="mt-1 text-sm leading-6 text-slate-500">{subtitle}</p>
           </div>
         </div>
-        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-          <span
-            className="h-2 w-2 rounded-full"
-            style={{ backgroundColor: accentColor }}
-          />
-          {countLabel || `${rows.length} records`}
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <div className="relative w-full sm:w-80">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder={searchPlaceholder || `Search ${title.toLowerCase()}...`}
+              className="no-native-search-clear h-10 rounded-xl border-slate-200 bg-slate-50 pl-9 pr-10 text-sm font-medium"
+            />
+            {searchTerm ? (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                aria-label={`Clear ${title} search`}
+                className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"
+              >
+                <X size={14} />
+              </button>
+            ) : null}
+          </div>
+          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: accentColor }}
+            />
+            {filteredRows.length}
+            {normalizedSearch ? ` of ${rows.length}` : ""} records
+          </div>
         </div>
       </div>
 
@@ -141,8 +186,8 @@ function AccountSection({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {rows.length ? (
-              rows.map((row, index) => (
+            {filteredRows.length ? (
+              filteredRows.map((row, index) => (
                 <tr
                   key={row.id || row.account_code || `${title}-${index}`}
                   className="bg-white transition hover:bg-slate-50/80"
@@ -166,8 +211,18 @@ function AccountSection({
                     <Icon size={22} />
                   </div>
                   <p className="mt-3 text-sm font-semibold text-slate-700">
-                    {emptyText}
+                    {rows.length ? `No matching ${title.toLowerCase()} found.` : emptyText}
                   </p>
+                  {rows.length ? (
+                    <button
+                      type="button"
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                      onClick={() => setSearchTerm("")}
+                    >
+                      <X size={16} />
+                      Clear Search
+                    </button>
+                  ) : null}
                 </td>
               </tr>
             )}
@@ -375,6 +430,14 @@ export default function AccountsPage() {
           rows={chartData}
           icon={BookOpen}
           emptyText="No chart accounts found."
+          searchPlaceholder="Search code, name, type..."
+          searchFields={[
+            "id",
+            "account_code",
+            "account_name",
+            "account_type",
+            "normal_balance",
+          ]}
           columns={[
             {
               key: "account_code",
@@ -405,6 +468,15 @@ export default function AccountsPage() {
           rows={financialData}
           icon={Landmark}
           emptyText="No financial accounts found."
+          searchPlaceholder="Search account, type, balance..."
+          searchFields={[
+            "id",
+            "account_code",
+            "account_name",
+            "account_type",
+            "current_balance",
+            "chart_account_id",
+          ]}
           columns={[
             {
               key: "account_name",
@@ -433,6 +505,18 @@ export default function AccountsPage() {
         rows={customerRows}
         icon={UsersRound}
         emptyText="No customer accounts found."
+        searchPlaceholder="Search customer, type, balance..."
+        searchFields={[
+          "id",
+          "account_code",
+          "account_name",
+          "account_type",
+          "current_balance",
+          "customer_name",
+          "full_name",
+          "phone",
+          "email",
+        ]}
         columns={[
           {
             key: "account_name",
@@ -462,6 +546,18 @@ export default function AccountsPage() {
         rows={supplierRows}
         icon={Truck}
         emptyText="No supplier accounts found."
+        searchPlaceholder="Search supplier, type, balance..."
+        searchFields={[
+          "id",
+          "account_code",
+          "account_name",
+          "account_type",
+          "current_balance",
+          "supplier_name",
+          "contact_person",
+          "phone",
+          "email",
+        ]}
         columns={[
           {
             key: "account_name",

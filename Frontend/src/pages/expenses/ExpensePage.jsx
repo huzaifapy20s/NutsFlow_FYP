@@ -7,6 +7,7 @@ import {
   Plus,
   ReceiptText,
   Save,
+  Search,
   WalletCards,
   X,
 } from "lucide-react";
@@ -73,7 +74,33 @@ export default function ExpensePage() {
     (state) => state.accounts,
   );
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const expenses = useMemo(() => (Array.isArray(list) ? list : []), [list]);
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredExpenses = useMemo(() => {
+    if (!normalizedSearch) return expenses;
+
+    return expenses.filter((expense) => {
+      const expenseDate = formatDate(expense.expense_date);
+      const searchableText = [
+        expense.id,
+        expense.description,
+        expense.expense_date,
+        expenseDate,
+        expense.reference_number,
+        expense.amount,
+      ]
+        .filter((value) => value !== null && value !== undefined)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(normalizedSearch);
+    });
+  }, [expenses, normalizedSearch]);
+  const filteredExpenseAmount = filteredExpenses.reduce(
+    (sum, expense) => sum + toNumber(expense.amount),
+    0,
+  );
   const expenseAccounts = Array.isArray(chartAccounts)
     ? chartAccounts.filter((account) => account.account_type === "expense")
     : [];
@@ -193,13 +220,41 @@ export default function ExpensePage() {
               All saved expenses with dates, references, and amounts.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            <div className="relative w-full sm:w-80">
+              <Search
+                size={16}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search expense, date, reference..."
+                className="no-native-search-clear h-10 rounded-xl border-slate-200 bg-slate-50 pl-9 pr-10 text-sm font-medium"
+              />
+              {searchTerm ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  aria-label="Clear expense search"
+                  className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"
+                >
+                  <X size={14} />
+                </button>
+              ) : null}
+            </div>
             <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
               <span
                 className="h-2 w-2 rounded-full"
                 style={{ backgroundColor: accentColor }}
               />
-              {expenses.length} records
+              {filteredExpenses.length}
+              {normalizedSearch ? ` of ${expenses.length}` : ""} records
+            </div>
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+              <WalletCards size={14} className="text-slate-500" />
+              {formatCurrency(filteredExpenseAmount)}
             </div>
             <button
               type="button"
@@ -219,7 +274,7 @@ export default function ExpensePage() {
               Loading expenses...
             </p>
           </div>
-        ) : expenses.length > 0 ? (
+        ) : filteredExpenses.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[850px] text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50/80 text-xs uppercase tracking-[0.12em] text-slate-500">
@@ -232,7 +287,7 @@ export default function ExpensePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {expenses.map((expense, index) => (
+                {filteredExpenses.map((expense, index) => (
                   <tr
                     key={expense.id || index}
                     className="bg-white transition hover:bg-slate-50/80"
@@ -282,11 +337,23 @@ export default function ExpensePage() {
               <ReceiptText size={22} />
             </div>
             <h3 className="mt-4 text-base font-bold text-slate-950">
-              No expenses found
+              {expenses.length ? "No matching expenses found" : "No expenses found"}
             </h3>
             <p className="mt-2 text-sm text-slate-500">
-              Record your first operating expense to see it here.
+              {expenses.length
+                ? "Try another description, date, reference number, or amount."
+                : "Record your first operating expense to see it here."}
             </p>
+            {expenses.length ? (
+              <button
+                type="button"
+                className="mt-5 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                onClick={() => setSearchTerm("")}
+              >
+                <X size={16} />
+                Clear Search
+              </button>
+            ) : null}
           </div>
         )}
       </section>

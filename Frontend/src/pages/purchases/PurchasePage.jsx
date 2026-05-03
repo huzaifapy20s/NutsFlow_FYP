@@ -12,6 +12,7 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Search,
   Trash2,
   Truck,
   X,
@@ -33,7 +34,7 @@ import {
 import { fetchSuppliers } from "../../features/suppliers/suppliersSlice";
 import { fetchItems } from "../../features/items/itemsSlice";
 import { fetchFinancialAccounts, fetchSupplierAccounts } from "../../features/accounts/accountsSlice";
-import { formatCurrency } from "../../utils/formatters";
+import { formatCurrency, formatDate } from "../../utils/formatters";
 
 const accentColor = "#ffcf83";
 
@@ -100,7 +101,38 @@ export default function PurchasePage() {
   const [viewError, setViewError] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const undoTimerRef = useRef(null);
+
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredPurchases = useMemo(() => {
+    if (!normalizedSearch) return purchases;
+
+    return purchases.filter((purchase) => {
+      const formattedDate = formatDate(purchase.purchase_date);
+      const searchableText = [
+        purchase.id,
+        purchase.invoice_number,
+        purchase.supplier_name,
+        purchase.purchase_date,
+        formattedDate,
+        purchase.total_amount,
+        purchase.paid_amount,
+        purchase.balance_due,
+        purchase.payment_status,
+        Number(purchase.balance_due || 0) > 0 ? "due" : "paid clear",
+      ]
+        .filter((value) => value !== null && value !== undefined)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(normalizedSearch);
+    });
+  }, [purchases, normalizedSearch]);
+  const filteredPurchaseDue = filteredPurchases.reduce(
+    (sum, purchase) => sum + Number(purchase.balance_due || 0),
+    0,
+  );
 
   const purchaseStats = useMemo(() => {
     const totalAmount = purchases.reduce((sum, purchase) => sum + Number(purchase.total_amount || 0), 0);
@@ -374,14 +406,44 @@ export default function PurchasePage() {
               <h2 className="mt-1 text-lg font-semibold text-slate-950">Purchase Directory</h2>
               <p className="mt-1 text-sm text-slate-500">Clean purchase list with invoice, supplier, date, total amount, and due balance.</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+              <div className="relative w-full sm:w-80">
+                <Search
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => {
+                    setSearchTerm(event.target.value);
+                    setActiveActionPurchase(null);
+                  }}
+                  placeholder="Search invoice, supplier, date..."
+                  className="no-native-search-clear h-10 rounded-lg border-slate-200 bg-slate-50 pl-9 pr-10 text-sm font-medium"
+                />
+                {searchTerm ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setActiveActionPurchase(null);
+                    }}
+                    aria-label="Clear purchase search"
+                    className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"
+                  >
+                    <X size={14} />
+                  </button>
+                ) : null}
+              </div>
               <div className="flex w-fit items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: accentColor }} />
-                {purchaseStats.totalPurchases} records
+                {filteredPurchases.length}
+                {normalizedSearch ? ` of ${purchaseStats.totalPurchases}` : ""} records
               </div>
               <div className="flex w-fit items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
                 <BadgeDollarSign size={15} className="text-slate-500" />
-                {formatCurrency(purchaseStats.totalDue)} due
+                {formatCurrency(filteredPurchaseDue)} due
               </div>
               <button
                 type="button"
@@ -395,7 +457,7 @@ export default function PurchasePage() {
           </div>
         </div>
 
-        {purchases.length ? (
+        {filteredPurchases.length ? (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50/80 text-xs uppercase tracking-[0.12em] text-slate-500">
@@ -411,7 +473,7 @@ export default function PurchasePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {purchases.map((purchase, index) => {
+                {filteredPurchases.map((purchase, index) => {
                   const hasDue = Number(purchase.balance_due || 0) > 0;
                   const isLoading = loadingPurchaseId === purchase.id;
 
@@ -447,7 +509,7 @@ export default function PurchasePage() {
                       </td>
                       <td className="px-5 py-4 align-middle">
                         <span className="inline-flex rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm font-semibold text-slate-700">
-                          {purchase.purchase_date || "-"}
+                          {formatDate(purchase.purchase_date)}
                         </span>
                       </td>
                       <td className="px-5 py-4 text-right align-middle">
@@ -542,18 +604,36 @@ export default function PurchasePage() {
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#ffcf83] bg-[#ffcf83]/25 text-slate-950">
               <Boxes size={26} />
             </div>
-            <h3 className="text-base font-semibold text-slate-950">No purchases found</h3>
+            <h3 className="text-base font-semibold text-slate-950">
+              {purchases.length ? "No matching purchases found" : "No purchases found"}
+            </h3>
             <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
-              Create your first supplier purchase from the add purchase modal to start updating stock and payable records.
+              {purchases.length
+                ? "Try another invoice number, supplier, date, amount, or payment status."
+                : "Create your first supplier purchase from the add purchase modal to start updating stock and payable records."}
             </p>
-            <button
-              type="button"
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-              onClick={handleOpenCreateModal}
-            >
-              <Plus size={16} className="text-[#ffcf83]" />
-              Add Purchase
-            </button>
+            {purchases.length ? (
+              <button
+                type="button"
+                className="mt-5 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                onClick={() => {
+                  setSearchTerm("");
+                  setActiveActionPurchase(null);
+                }}
+              >
+                <X size={16} />
+                Clear Search
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+                onClick={handleOpenCreateModal}
+              >
+                <Plus size={16} className="text-[#ffcf83]" />
+                Add Purchase
+              </button>
+            )}
           </div>
         )}
       </section>
@@ -766,7 +846,7 @@ export default function PurchasePage() {
             <div className="max-h-[calc(92vh-96px)] overflow-y-auto p-6">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <DetailBlock label="Purchase ID" value={selectedPurchase.id || "-"} />
-                <DetailBlock label="Purchase Date" value={selectedPurchase.purchase_date || "-"} />
+                <DetailBlock label="Purchase Date" value={formatDate(selectedPurchase.purchase_date)} />
                 <DetailBlock label="Payment Status" value={selectedPurchase.payment_status || "-"} />
                 <DetailBlock label="Paid Amount" value={formatCurrency(selectedPurchase.paid_amount)} />
                 <DetailBlock label="Balance Due" value={formatCurrency(selectedPurchase.balance_due)} />

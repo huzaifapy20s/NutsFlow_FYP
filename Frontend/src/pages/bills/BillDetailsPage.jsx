@@ -8,9 +8,11 @@ import {
   Eye,
   FileText,
   ReceiptText,
+  Search,
   Trash2,
   Users,
   WalletCards,
+  X,
 } from "lucide-react";
 import { fetchItems } from "../../features/items/itemsSlice";
 import { fetchRecentBills } from "../../features/reports/reportsSlice";
@@ -87,8 +89,34 @@ export default function BillDetailsPage() {
   const navigate = useNavigate();
   const { recentBills, loading, error } = useSelector((state) => state.reports);
   const [deleteLoading, setDeleteLoading] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const bills = Array.isArray(recentBills) ? recentBills : [];
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+
+  const filteredBills = useMemo(() => {
+    if (!normalizedSearch) return bills;
+
+    return bills.filter((bill) => {
+      const billDate = formatDate(bill.sale_date);
+      const searchableText = [
+        bill.id,
+        bill.invoice_number,
+        bill.customer_name || "Walk-in customer",
+        bill.sale_date,
+        billDate,
+        bill.payment_status,
+        bill.total_amount,
+        bill.paid_amount,
+        bill.balance_due,
+      ]
+        .filter((value) => value !== null && value !== undefined)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(normalizedSearch);
+    });
+  }, [bills, normalizedSearch]);
 
   const billStats = useMemo(() => {
     const totalAmount = bills.reduce(
@@ -245,16 +273,42 @@ export default function BillDetailsPage() {
                 All saved bills with payment and balance tracking.
               </p>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-              <span
-                className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: accentColor }}
-              />
-              {bills.length} records
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="relative w-full sm:w-80">
+                <Search
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search customer, invoice, date..."
+                  className="no-native-search-clear h-10 rounded-xl border-slate-200 bg-slate-50 pl-9 pr-10 text-sm font-medium"
+                />
+                {searchTerm ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm("")}
+                    aria-label="Clear bill search"
+                    className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"
+                  >
+                    <X size={14} />
+                  </button>
+                ) : null}
+              </div>
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: accentColor }}
+                />
+                {filteredBills.length}
+                {normalizedSearch ? ` of ${bills.length}` : ""} records
+              </div>
             </div>
           </div>
 
-          {bills.length > 0 ? (
+          {filteredBills.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1040px] text-left text-sm">
                 <thead className="border-b border-slate-200 bg-slate-50/80 text-xs uppercase tracking-[0.12em] text-slate-500">
@@ -277,7 +331,7 @@ export default function BillDetailsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {bills.map((bill, index) => {
+                  {filteredBills.map((bill, index) => {
                     const balanceDue = toNumber(bill.balance_due);
 
                     return (
@@ -377,10 +431,12 @@ export default function BillDetailsPage() {
                 <ReceiptText size={22} />
               </div>
               <h3 className="mt-4 text-base font-bold text-slate-950">
-                No bills found
+                {bills.length ? "No matching bills found" : "No bills found"}
               </h3>
               <p className="mt-2 text-sm text-slate-500">
-                There are no bills to display at the moment.
+                {bills.length
+                  ? "Try another customer name, invoice number, date, or amount."
+                  : "There are no bills to display at the moment."}
               </p>
             </div>
           )}

@@ -21,6 +21,15 @@
   .shadow-soft {
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
   }
+
+  .no-native-search-clear::-webkit-search-cancel-button,
+  .no-native-search-clear::-webkit-search-decoration,
+  .no-native-search-clear::-webkit-search-results-button,
+  .no-native-search-clear::-webkit-search-results-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+    display: none;
+  }
 }
 
 @layer components {

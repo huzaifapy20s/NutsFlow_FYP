@@ -12,6 +12,7 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Search,
   Trash2,
   UserRound,
   UsersRound,
@@ -69,9 +70,34 @@ export default function CustomerPage() {
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [undoItemId, setUndoItemId] = useState(null);
   const [errors, setErrors] = useState({});
+  const [searchTerm, setSearchTerm] = useState("");
   const undoTimerRef = useRef(null);
 
   const customers = Array.isArray(list) ? list : [];
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredCustomers = useMemo(() => {
+    if (!normalizedSearch) return customers;
+
+    return customers.filter((customer) => {
+      const searchableText = [
+        customer.id,
+        customer.full_name,
+        customer.phone,
+        customer.email,
+        customer.address,
+        customer.opening_balance,
+      ]
+        .filter((value) => value !== null && value !== undefined)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(normalizedSearch);
+    });
+  }, [customers, normalizedSearch]);
+  const filteredCustomerBalance = filteredCustomers.reduce(
+    (sum, customer) => sum + Number(customer.opening_balance || 0),
+    0,
+  );
 
   const customerStats = useMemo(() => {
     const totalBalance = customers.reduce((sum, customer) => sum + Number(customer.opening_balance || 0), 0);
@@ -317,14 +343,44 @@ export default function CustomerPage() {
               <h2 className="mt-1 text-lg font-semibold text-slate-950">Customer Directory</h2>
               <p className="mt-1 text-sm text-slate-500">Clean customer list with ID, contact details, address, and balance due.</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+              <div className="relative w-full sm:w-80">
+                <Search
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => {
+                    setSearchTerm(event.target.value);
+                    setActiveActionItem(null);
+                  }}
+                  placeholder="Search name, phone, email..."
+                  className="no-native-search-clear h-10 rounded-lg border-slate-200 bg-slate-50 pl-9 pr-10 text-sm font-medium"
+                />
+                {searchTerm ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setActiveActionItem(null);
+                    }}
+                    aria-label="Clear customer search"
+                    className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"
+                  >
+                    <X size={14} />
+                  </button>
+                ) : null}
+              </div>
               <div className="flex w-fit items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: accentColor }} />
-                {customerStats.totalCustomers} records
+                {filteredCustomers.length}
+                {normalizedSearch ? ` of ${customerStats.totalCustomers}` : ""} records
               </div>
               <div className="flex w-fit items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
                 <BadgeDollarSign size={15} className="text-slate-500" />
-                {formatCurrency(customerStats.totalBalance)} due
+                {formatCurrency(filteredCustomerBalance)} due
               </div>
               <button
                 type="button"
@@ -338,7 +394,7 @@ export default function CustomerPage() {
           </div>
         </div>
 
-        {customers.length ? (
+        {filteredCustomers.length ? (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50/80 text-xs uppercase tracking-[0.12em] text-slate-500">
@@ -353,7 +409,7 @@ export default function CustomerPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {customers.map((customer, index) => {
+                {filteredCustomers.map((customer, index) => {
                   const hasBalance = Number(customer.opening_balance || 0) > 0;
 
                   return (
@@ -474,18 +530,36 @@ export default function CustomerPage() {
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#ffcf83] bg-[#ffcf83]/25 text-slate-950">
               <UserRound size={26} />
             </div>
-            <h3 className="text-base font-semibold text-slate-950">No customers found</h3>
+            <h3 className="text-base font-semibold text-slate-950">
+              {customers.length ? "No matching customers found" : "No customers found"}
+            </h3>
             <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
-              Create your first customer record from the add customer modal to start managing balances and ledgers.
+              {customers.length
+                ? "Try another name, phone number, email, address, or balance."
+                : "Create your first customer record from the add customer modal to start managing balances and ledgers."}
             </p>
-            <button
-              type="button"
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-              onClick={handleOpenCreateModal}
-            >
-              <Plus size={16} className="text-[#ffcf83]" />
-              Add Customer
-            </button>
+            {customers.length ? (
+              <button
+                type="button"
+                className="mt-5 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                onClick={() => {
+                  setSearchTerm("");
+                  setActiveActionItem(null);
+                }}
+              >
+                <X size={16} />
+                Clear Search
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+                onClick={handleOpenCreateModal}
+              >
+                <Plus size={16} className="text-[#ffcf83]" />
+                Add Customer
+              </button>
+            )}
           </div>
         )}
       </section>

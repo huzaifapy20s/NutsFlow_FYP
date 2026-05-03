@@ -13,6 +13,7 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Search,
   Trash2,
   Truck,
   UserRound,
@@ -71,9 +72,35 @@ export default function SupplierPage() {
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [undoItemId, setUndoItemId] = useState(null);
   const [errors, setErrors] = useState({});
+  const [searchTerm, setSearchTerm] = useState("");
   const undoTimerRef = useRef(null);
 
   const suppliers = Array.isArray(list) ? list : [];
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredSuppliers = useMemo(() => {
+    if (!normalizedSearch) return suppliers;
+
+    return suppliers.filter((supplier) => {
+      const searchableText = [
+        supplier.id,
+        supplier.supplier_name,
+        supplier.contact_person,
+        supplier.phone,
+        supplier.email,
+        supplier.address,
+        supplier.opening_balance,
+      ]
+        .filter((value) => value !== null && value !== undefined)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(normalizedSearch);
+    });
+  }, [suppliers, normalizedSearch]);
+  const filteredSupplierPayable = filteredSuppliers.reduce(
+    (sum, supplier) => sum + Number(supplier.opening_balance || 0),
+    0,
+  );
 
   const supplierStats = useMemo(() => {
     const totalPayable = suppliers.reduce((sum, supplier) => sum + Number(supplier.opening_balance || 0), 0);
@@ -330,14 +357,44 @@ export default function SupplierPage() {
               <h2 className="mt-1 text-lg font-semibold text-slate-950">Supplier Directory</h2>
               <p className="mt-1 text-sm text-slate-500">Clean supplier list with ID, contact details, address, and payable balance.</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+              <div className="relative w-full sm:w-80">
+                <Search
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => {
+                    setSearchTerm(event.target.value);
+                    setActiveActionItem(null);
+                  }}
+                  placeholder="Search supplier, contact, phone..."
+                  className="no-native-search-clear h-10 rounded-lg border-slate-200 bg-slate-50 pl-9 pr-10 text-sm font-medium"
+                />
+                {searchTerm ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setActiveActionItem(null);
+                    }}
+                    aria-label="Clear supplier search"
+                    className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"
+                  >
+                    <X size={14} />
+                  </button>
+                ) : null}
+              </div>
               <div className="flex w-fit items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: accentColor }} />
-                {supplierStats.totalSuppliers} records
+                {filteredSuppliers.length}
+                {normalizedSearch ? ` of ${supplierStats.totalSuppliers}` : ""} records
               </div>
               <div className="flex w-fit items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
                 <BadgeDollarSign size={15} className="text-slate-500" />
-                {formatCurrency(supplierStats.totalPayable)} due
+                {formatCurrency(filteredSupplierPayable)} due
               </div>
               <button
                 type="button"
@@ -351,7 +408,7 @@ export default function SupplierPage() {
           </div>
         </div>
 
-        {suppliers.length ? (
+        {filteredSuppliers.length ? (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50/80 text-xs uppercase tracking-[0.12em] text-slate-500">
@@ -366,7 +423,7 @@ export default function SupplierPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {suppliers.map((supplier, index) => {
+                {filteredSuppliers.map((supplier, index) => {
                   const hasPayable = Number(supplier.opening_balance || 0) > 0;
 
                   return (
@@ -493,18 +550,36 @@ export default function SupplierPage() {
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#ffcf83] bg-[#ffcf83]/25 text-slate-950">
               <Building2 size={26} />
             </div>
-            <h3 className="text-base font-semibold text-slate-950">No suppliers found</h3>
+            <h3 className="text-base font-semibold text-slate-950">
+              {suppliers.length ? "No matching suppliers found" : "No suppliers found"}
+            </h3>
             <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
-              Create your first supplier record from the add supplier modal to start managing purchases and payables.
+              {suppliers.length
+                ? "Try another supplier name, contact person, phone, email, address, or balance."
+                : "Create your first supplier record from the add supplier modal to start managing purchases and payables."}
             </p>
-            <button
-              type="button"
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-              onClick={handleOpenCreateModal}
-            >
-              <Plus size={16} className="text-[#ffcf83]" />
-              Add Supplier
-            </button>
+            {suppliers.length ? (
+              <button
+                type="button"
+                className="mt-5 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                onClick={() => {
+                  setSearchTerm("");
+                  setActiveActionItem(null);
+                }}
+              >
+                <X size={16} />
+                Clear Search
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+                onClick={handleOpenCreateModal}
+              >
+                <Plus size={16} className="text-[#ffcf83]" />
+                Add Supplier
+              </button>
+            )}
           </div>
         )}
       </section>

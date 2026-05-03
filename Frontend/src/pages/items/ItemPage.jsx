@@ -11,6 +11,7 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Search,
   Tags,
   Trash2,
   Warehouse,
@@ -86,10 +87,33 @@ export default function ItemPage() {
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [undoItemId, setUndoItemId] = useState(null);
   const [errors, setErrors] = useState({});
+  const [searchTerm, setSearchTerm] = useState("");
   const undoTimerRef = useRef(null);
 
   const safeItems = Array.isArray(list) ? list : [];
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredItems = normalizedSearch
+    ? safeItems.filter((item) => {
+        const searchableText = [
+          item.id,
+          item.item_name,
+          item.sku,
+          item.category,
+          item.unit,
+          item.stock_quantity,
+          item.low_stock_threshold,
+          item.average_cost,
+          item.sale_price,
+        ]
+          .filter((value) => value !== null && value !== undefined)
+          .join(" ")
+          .toLowerCase();
+
+        return searchableText.includes(normalizedSearch);
+      })
+    : safeItems;
   const totalStock = safeItems.reduce((sum, item) => sum + Number(item.stock_quantity || 0), 0);
+  const filteredStock = filteredItems.reduce((sum, item) => sum + Number(item.stock_quantity || 0), 0);
   const totalInventoryValue = safeItems.reduce(
     (sum, item) => sum + Number(item.stock_quantity || 0) * Number(item.average_cost || 0),
     0,
@@ -364,14 +388,44 @@ export default function ItemPage() {
               <h2 className="mt-1 text-lg font-semibold text-slate-950">Item Catalogue</h2>
               <p className="mt-1 text-sm text-slate-500">Clean item list with item number, stock, cost, and sale price.</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+              <div className="relative w-full sm:w-80">
+                <Search
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => {
+                    setSearchTerm(event.target.value);
+                    setActiveActionItem(null);
+                  }}
+                  placeholder="Search item, SKU, category..."
+                  className="no-native-search-clear h-10 rounded-lg border-slate-200 bg-slate-50 pl-9 pr-10 text-sm font-medium"
+                />
+                {searchTerm ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setActiveActionItem(null);
+                    }}
+                    aria-label="Clear item search"
+                    className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"
+                  >
+                    <X size={14} />
+                  </button>
+                ) : null}
+              </div>
               <div className="flex w-fit items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: accentColor }} />
-                {safeItems.length} records
+                {filteredItems.length}
+                {normalizedSearch ? ` of ${safeItems.length}` : ""} records
               </div>
               <div className="flex w-fit items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
                 <Warehouse size={15} className="text-slate-500" />
-                {totalStock.toLocaleString()} units
+                {filteredStock.toLocaleString()} units
               </div>
               <button
                 type="button"
@@ -385,7 +439,7 @@ export default function ItemPage() {
           </div>
         </div>
 
-        {safeItems.length ? (
+        {filteredItems.length ? (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50/80 text-xs uppercase tracking-[0.12em] text-slate-500">
@@ -400,7 +454,7 @@ export default function ItemPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {safeItems.map((item, index) => (
+                {filteredItems.map((item, index) => (
                   <tr key={item.id || index} className="group transition hover:bg-[#ffcf83]/[0.08]">
                     <td className="px-5 py-4 align-middle">
                       <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-bold tabular-nums text-slate-600 group-hover:border-[#ffcf83]/70 group-hover:bg-white">
@@ -507,18 +561,33 @@ export default function ItemPage() {
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#ffcf83] bg-[#ffcf83]/25 text-slate-950">
               <PackagePlus size={26} />
             </div>
-            <h3 className="text-base font-semibold text-slate-950">No items found</h3>
+            <h3 className="text-base font-semibold text-slate-950">
+              {safeItems.length ? "No matching items found" : "No items found"}
+            </h3>
             <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
-              Create your first product record from the add item modal to start managing stock and pricing.
+              {safeItems.length
+                ? "Try another item name, SKU, category, unit, or price."
+                : "Create your first product record from the add item modal to start managing stock and pricing."}
             </p>
-            <button
-              type="button"
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-              onClick={handleOpenCreateModal}
-            >
-              <Plus size={16} className="text-[#ffcf83]" />
-              Add Item
-            </button>
+            {safeItems.length ? (
+              <button
+                type="button"
+                className="mt-5 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                onClick={() => setSearchTerm("")}
+              >
+                <X size={16} />
+                Clear Search
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+                onClick={handleOpenCreateModal}
+              >
+                <Plus size={16} className="text-[#ffcf83]" />
+                Add Item
+              </button>
+            )}
           </div>
         )}
       </section>

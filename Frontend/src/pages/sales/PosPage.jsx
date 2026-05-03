@@ -6,6 +6,7 @@ import {
   CreditCard,
   PackageCheck,
   ReceiptText,
+  Search,
   ShoppingCart,
   Trash2,
   UserRound,
@@ -241,6 +242,30 @@ export default function PosPage() {
     setBillModalOpen(false);
   };
 
+  const [itemSearchTerm, setItemSearchTerm] = useState("");
+  const normalizedItemSearch = itemSearchTerm.trim().toLowerCase();
+  const filteredItemOptions = useMemo(() => {
+    if (!normalizedItemSearch) return itemOptions;
+
+    return itemOptions.filter((item) => {
+      const searchableText = [
+        item.id,
+        item.item_name,
+        item.sku,
+        item.category,
+        item.unit,
+        item.stock_quantity,
+        item.sale_price,
+        Number(item.stock_quantity || 0) > 0 ? "in stock available" : "out of stock",
+      ]
+        .filter((value) => value !== null && value !== undefined)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(normalizedItemSearch);
+    });
+  }, [itemOptions, normalizedItemSearch]);
+
   return (
     <div className="space-y-6">
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -322,18 +347,44 @@ export default function PosPage() {
                 Select products to add them to the current bill.
               </p>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-              <span
-                className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: accentColor }}
-              />
-              {itemOptions.length} items
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+              <div className="relative w-full sm:w-80">
+                <Search
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="search"
+                  value={itemSearchTerm}
+                  onChange={(event) => setItemSearchTerm(event.target.value)}
+                  placeholder="Search item, SKU, category..."
+                  className="no-native-search-clear h-10 rounded-xl border-slate-200 bg-slate-50 pl-9 pr-10 text-sm font-medium"
+                />
+                {itemSearchTerm ? (
+                  <button
+                    type="button"
+                    onClick={() => setItemSearchTerm("")}
+                    aria-label="Clear item search"
+                    className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"
+                  >
+                    <X size={14} />
+                  </button>
+                ) : null}
+              </div>
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: accentColor }}
+                />
+                {filteredItemOptions.length}
+                {normalizedItemSearch ? ` of ${itemOptions.length}` : ""} items
+              </div>
             </div>
           </div>
 
-          {itemOptions.length ? (
+          {filteredItemOptions.length ? (
             <div className="grid gap-4 p-5 sm:grid-cols-2 2xl:grid-cols-3">
-              {itemOptions.map((item) => (
+              {filteredItemOptions.map((item) => (
                 <button
                   key={item.id}
                   className="group rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#ffcf83] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#ffcf83]/70"
@@ -385,12 +436,23 @@ export default function PosPage() {
                 <PackageCheck size={22} />
               </div>
               <h3 className="mt-4 text-base font-bold text-slate-950">
-                No items available
+                {itemOptions.length ? "No matching items found" : "No items available"}
               </h3>
               <p className="mt-2 text-sm text-slate-500">
-                Add inventory items first, then they will appear in the POS
-                catalogue.
+                {itemOptions.length
+                  ? "Try another item name, SKU, category, price, or stock status."
+                  : "Add inventory items first, then they will appear in the POS catalogue."}
               </p>
+              {itemOptions.length ? (
+                <button
+                  type="button"
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                  onClick={() => setItemSearchTerm("")}
+                >
+                  <X size={16} />
+                  Clear Search
+                </button>
+              ) : null}
             </div>
           )}
         </section>
