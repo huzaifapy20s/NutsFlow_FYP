@@ -110,19 +110,36 @@ function AccountSection({
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const normalizedSearch = searchTerm.trim().toLowerCase();
+  const numberedRows = useMemo(
+    () => rows.map((row, index) => ({ row, rowNumber: index + 1 })),
+    [rows],
+  );
   const filteredRows = useMemo(() => {
-    if (!normalizedSearch) return rows;
+    if (!normalizedSearch) return numberedRows;
 
-    return rows.filter((row) => {
-      const searchableText = searchFields
-        .map((field) => (typeof field === "function" ? field(row) : row[field]))
+    const rowNumberMatch = normalizedSearch.match(/^(?:#|no\.?\s*)?(\d+)$/);
+    if (rowNumberMatch) {
+      const requestedRowNumber = Number(rowNumberMatch[1]);
+      return numberedRows.filter(
+        ({ rowNumber }) => rowNumber === requestedRowNumber,
+      );
+    }
+
+    return numberedRows.filter(({ row, rowNumber }) => {
+      const searchableText = [
+        rowNumber,
+        `#${rowNumber}`,
+        ...searchFields.map((field) =>
+          typeof field === "function" ? field(row) : row[field],
+        ),
+      ]
         .filter((value) => value !== null && value !== undefined)
         .join(" ")
         .toLowerCase();
 
       return searchableText.includes(normalizedSearch);
     });
-  }, [rows, searchFields, normalizedSearch]);
+  }, [numberedRows, searchFields, normalizedSearch]);
 
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -175,6 +192,7 @@ function AccountSection({
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-[0.12em] text-slate-500">
             <tr>
+              <th className="w-[82px] px-5 py-3 font-semibold">No.</th>
               {columns.map((column) => (
                 <th
                   key={column.key}
@@ -187,11 +205,16 @@ function AccountSection({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredRows.length ? (
-              filteredRows.map((row, index) => (
+              filteredRows.map(({ row, rowNumber }, index) => (
                 <tr
                   key={row.id || row.account_code || `${title}-${index}`}
                   className="bg-white transition hover:bg-slate-50/80"
                 >
+                  <td className="px-5 py-4 align-middle text-slate-500">
+                    <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 text-xs font-semibold text-slate-600">
+                      {rowNumber}
+                    </span>
+                  </td>
                   {columns.map((column) => (
                     <td
                       key={column.key}
@@ -206,7 +229,7 @@ function AccountSection({
               ))
             ) : (
               <tr>
-                <td colSpan={columns.length} className="px-5 py-12 text-center">
+                <td colSpan={columns.length + 1} className="px-5 py-12 text-center">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-[#ffcf83] bg-[#ffcf83]/30 text-slate-950">
                     <Icon size={22} />
                   </div>
@@ -430,7 +453,7 @@ export default function AccountsPage() {
           rows={chartData}
           icon={BookOpen}
           emptyText="No chart accounts found."
-          searchPlaceholder="Search code, name, type..."
+          searchPlaceholder="Search no, code, name, type..."
           searchFields={[
             "id",
             "account_code",
@@ -468,7 +491,7 @@ export default function AccountsPage() {
           rows={financialData}
           icon={Landmark}
           emptyText="No financial accounts found."
-          searchPlaceholder="Search account, type, balance..."
+          searchPlaceholder="Search no, account, type, balance..."
           searchFields={[
             "id",
             "account_code",
@@ -505,7 +528,7 @@ export default function AccountsPage() {
         rows={customerRows}
         icon={UsersRound}
         emptyText="No customer accounts found."
-        searchPlaceholder="Search customer, type, balance..."
+        searchPlaceholder="Search no, customer, type, balance..."
         searchFields={[
           "id",
           "account_code",
@@ -546,7 +569,7 @@ export default function AccountsPage() {
         rows={supplierRows}
         icon={Truck}
         emptyText="No supplier accounts found."
-        searchPlaceholder="Search supplier, type, balance..."
+        searchPlaceholder="Search no, supplier, type, balance..."
         searchFields={[
           "id",
           "account_code",

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Banknote,
   CalendarDays,
+  ChevronDown,
   Edit,
   Eye,
   FileText,
@@ -90,6 +91,7 @@ export default function BillDetailsPage() {
   const { recentBills, loading, error } = useSelector((state) => state.reports);
   const [deleteLoading, setDeleteLoading] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeActionBill, setActiveActionBill] = useState(null);
 
   const bills = Array.isArray(recentBills) ? recentBills : [];
   const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -146,10 +148,12 @@ export default function BillDetailsPage() {
   }, [dispatch]);
 
   const handleViewBill = (billId) => {
+    setActiveActionBill(null);
     navigate(`/bills/${billId}`);
   };
 
   const handleUpdateBill = (billId) => {
+    setActiveActionBill(null);
     navigate(`/bills/${billId}/edit`);
   };
 
@@ -174,6 +178,7 @@ export default function BillDetailsPage() {
 
       dispatch(fetchRecentBills());
       dispatch(fetchItems());
+      setActiveActionBill(null);
     } catch (error) {
       console.error("Failed to delete bill:", error);
       alert("Failed to delete bill");
@@ -389,34 +394,65 @@ export default function BillDetailsPage() {
                         <td className="px-5 py-4 align-middle">
                           <StatusBadge status={bill.payment_status} />
                         </td>
-                        <td className="px-5 py-4 align-middle">
-                          <div className="flex items-center justify-end gap-2">
+                        <td className="px-5 py-4 text-right align-middle">
+                          <div className="relative inline-block text-left">
                             <button
-                              onClick={() => handleViewBill(bill.id)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#ffcf83] hover:bg-[#ffcf83]/20 hover:text-slate-950"
-                              title="View Details"
-                            >
-                              <Eye size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleUpdateBill(bill.id)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#ffcf83] hover:bg-[#ffcf83]/20 hover:text-slate-950"
-                              title="Update Bill"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteBill(bill.id)}
+                              type="button"
+                              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                              onClick={() =>
+                                setActiveActionBill(
+                                  activeActionBill === bill.id ? null : bill.id,
+                                )
+                              }
                               disabled={deleteLoading === bill.id}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
-                              title="Delete Bill"
                             >
-                              {deleteLoading === bill.id ? (
-                                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-rose-600" />
-                              ) : (
-                                <Trash2 size={16} />
-                              )}
+                              {deleteLoading === bill.id ? "Deleting" : "Actions"}
+                              <ChevronDown size={15} />
                             </button>
+
+                            {activeActionBill === bill.id ? (
+                              <div className="absolute right-0 z-20 mt-2 min-w-[180px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+                                <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2">
+                                  <span className="text-sm font-semibold text-slate-700">
+                                    Quick actions
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="rounded-lg p-1 text-slate-500 hover:bg-white hover:text-slate-900"
+                                    onClick={() => setActiveActionBill(null)}
+                                    aria-label="Close actions"
+                                  >
+                                    <X size={15} />
+                                  </button>
+                                </div>
+                                <div className="flex flex-col gap-1 p-2">
+                                  <button
+                                    type="button"
+                                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                                    onClick={() => handleViewBill(bill.id)}
+                                  >
+                                    <Eye size={16} />
+                                    View
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                                    onClick={() => handleUpdateBill(bill.id)}
+                                  >
+                                    <Edit size={16} />
+                                    Update
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
+                                    onClick={() => handleDeleteBill(bill.id)}
+                                  >
+                                    <Trash2 size={16} />
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            ) : null}
                           </div>
                         </td>
                       </tr>

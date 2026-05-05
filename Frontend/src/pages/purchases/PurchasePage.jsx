@@ -37,6 +37,7 @@ import { fetchFinancialAccounts, fetchSupplierAccounts } from "../../features/ac
 import { formatCurrency, formatDate } from "../../utils/formatters";
 
 const accentColor = "#ffcf83";
+const invoiceYearSuffix = String(new Date().getFullYear()).slice(-2);
 
 function PurchaseMetric({ title, value, helper, icon: Icon, accent = false }) {
   return (
@@ -650,7 +651,7 @@ export default function PurchasePage() {
                 <h3 className="mt-1 text-xl font-bold text-slate-950">
                   {editingId ? `Edit purchase #${editingId}` : "Create Purchase"}
                 </h3>
-                <p className="mt-1 text-sm text-slate-500">Enter supplier, invoice, payment account, paid amount, notes, and purchase lines.</p>
+                <p className="mt-1 text-sm text-slate-500">Enter supplier, payment account, paid amount, notes, and purchase lines.</p>
               </div>
               <button
                 type="button"
@@ -678,7 +679,17 @@ export default function PurchasePage() {
 
                 <div>
                   <label className="label">Invoice Number</label>
-                  <input value={draft.invoice_number} onChange={(e) => dispatch(setPurchaseField({ field: "invoice_number", value: e.target.value }))} />
+                  <input
+                    value={draft.invoice_number || ""}
+                    readOnly
+                    placeholder={`Auto-generated: PINV-${invoiceYearSuffix}-000001`}
+                    className="cursor-not-allowed bg-slate-100 text-slate-500"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">
+                    {editingId
+                      ? "Invoice number is preserved for saved purchases."
+                      : "The next purchase invoice is assigned when you save."}
+                  </p>
                 </div>
 
                 <div>

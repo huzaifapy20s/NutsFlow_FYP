@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -14,9 +14,11 @@ import {
   BookOpen,
   DollarSign,
   ReceiptText,
+  Search,
   TrendingDown,
   TrendingUp,
   UserRound,
+  X,
 } from "lucide-react";
 
 const accentColor = "#ffcf83";
@@ -134,6 +136,7 @@ export default function GeneralLedgerPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
+  const [transactionSearchTerm, setTransactionSearchTerm] = useState("");
 
   const { generalLedger, ledgerLoading, ledgerError } = useSelector(
     (state) => state.accounts,
@@ -187,6 +190,43 @@ export default function GeneralLedgerPage() {
     () => entries.reduce((sum, entry) => sum + toNumber(entry.credit), 0),
     [entries],
   );
+  const normalizedTransactionSearch = transactionSearchTerm.trim().toLowerCase();
+  const filteredEntries = useMemo(() => {
+    if (!normalizedTransactionSearch) return entries;
+
+    return entries.filter((entry) => {
+      const isOpening = String(entry.date).toLowerCase() === "opening";
+      const formattedDate = isOpening ? "Opening" : formatDate(entry.date);
+      const searchableText = [
+        entry.id,
+        entry.date,
+        formattedDate,
+        entry.description,
+        entry.reference_type,
+        entry.reference_id,
+        entry.debit,
+        entry.credit,
+        entry.balance,
+      ]
+        .filter((value) => value !== null && value !== undefined)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(normalizedTransactionSearch);
+    });
+  }, [entries, normalizedTransactionSearch]);
+  const filteredDebit = useMemo(
+    () => filteredEntries.reduce((sum, entry) => sum + toNumber(entry.debit), 0),
+    [filteredEntries],
+  );
+  const filteredCredit = useMemo(
+    () => filteredEntries.reduce((sum, entry) => sum + toNumber(entry.credit), 0),
+    [filteredEntries],
+  );
+  const filteredClosingBalance = useMemo(() => {
+    if (!filteredEntries.length) return 0;
+    return toNumber(filteredEntries[filteredEntries.length - 1]?.balance);
+  }, [filteredEntries]);
   const closingBalance = useMemo(() => {
     if (!entries.length) return 0;
     return toNumber(entries[entries.length - 1]?.balance);
@@ -323,12 +363,40 @@ export default function GeneralLedgerPage() {
                   Debit, credit and running balance history for this account.
                 </p>
               </div>
-              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{ backgroundColor: accentColor }}
-                />
-                {entries.length} entries
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                <div className="relative w-full sm:w-80">
+                  <Search
+                    size={16}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    type="search"
+                    value={transactionSearchTerm}
+                    onChange={(event) =>
+                      setTransactionSearchTerm(event.target.value)
+                    }
+                    placeholder="Search date, reference, amount..."
+                    className="no-native-search-clear h-10 rounded-xl border-slate-200 bg-slate-50 pl-9 pr-10 text-sm font-medium"
+                  />
+                  {transactionSearchTerm ? (
+                    <button
+                      type="button"
+                      onClick={() => setTransactionSearchTerm("")}
+                      aria-label="Clear ledger transaction search"
+                      className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"
+                    >
+                      <X size={14} />
+                    </button>
+                  ) : null}
+                </div>
+                <div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: accentColor }}
+                  />
+                  {filteredEntries.length}
+                  {normalizedTransactionSearch ? ` of ${entries.length}` : ""} entries
+                </div>
               </div>
             </div>
 
@@ -353,19 +421,31 @@ export default function GeneralLedgerPage() {
                 </thead>
 
                 <tbody className="divide-y divide-slate-100">
-                  {entries.length === 0 ? (
+                  {filteredEntries.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-5 py-14 text-center">
                         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-[#ffcf83] bg-[#ffcf83]/30 text-slate-950">
                           <BookOpen size={22} />
                         </div>
                         <p className="mt-3 text-sm font-semibold text-slate-700">
-                          No ledger transactions found.
+                          {entries.length
+                            ? "No matching ledger transactions found."
+                            : "No ledger transactions found."}
                         </p>
+                        {entries.length ? (
+                          <button
+                            type="button"
+                            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                            onClick={() => setTransactionSearchTerm("")}
+                          >
+                            <X size={16} />
+                            Clear Search
+                          </button>
+                        ) : null}
                       </td>
                     </tr>
                   ) : (
-                    entries.map((entry, index) => {
+                    filteredEntries.map((entry, index) => {
                       const debit = toNumber(entry.debit);
                       const credit = toNumber(entry.credit);
                       const balance = toNumber(entry.balance);
@@ -417,26 +497,36 @@ export default function GeneralLedgerPage() {
                   )}
                 </tbody>
 
-                {entries.length > 0 && (
+                {filteredEntries.length > 0 && (
                   <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-semibold">
                     <tr>
                       <td colSpan={4} className="px-5 py-4 text-slate-700">
-                        Totals
+                        {normalizedTransactionSearch ? "Filtered Totals" : "Totals"}
                       </td>
                       <td className="px-5 py-4 text-right text-emerald-700">
-                        {formatCurrency(totalDebit)}
+                        {formatCurrency(
+                          normalizedTransactionSearch ? filteredDebit : totalDebit,
+                        )}
                       </td>
                       <td className="px-5 py-4 text-right text-rose-600">
-                        {formatCurrency(totalCredit)}
+                        {formatCurrency(
+                          normalizedTransactionSearch ? filteredCredit : totalCredit,
+                        )}
                       </td>
                       <td
                         className={`px-5 py-4 text-right ${
-                          closingBalance >= 0
+                          (normalizedTransactionSearch
+                            ? filteredClosingBalance
+                            : closingBalance) >= 0
                             ? "text-slate-950"
                             : "text-rose-600"
                         }`}
                       >
-                        {formatCurrency(closingBalance)}
+                        {formatCurrency(
+                          normalizedTransactionSearch
+                            ? filteredClosingBalance
+                            : closingBalance,
+                        )}
                       </td>
                     </tr>
                   </tfoot>

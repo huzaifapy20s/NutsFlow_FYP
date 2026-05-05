@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   BadgePercent,
   Banknote,
   CreditCard,
   PackageCheck,
+  Printer,
   ReceiptText,
   Search,
   ShoppingCart,
@@ -98,6 +100,7 @@ function SummaryLine({ label, value, muted = false, strong = false }) {
 
 export default function PosPage() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { list: items } = useSelector((state) => state.items);
   const { list: customers } = useSelector((state) => state.customers);
   const { financialAccounts } = useSelector((state) => state.accounts);
@@ -217,19 +220,33 @@ export default function PosPage() {
     setBillModalOpen(true);
   };
 
-  const handleSaveBill = async () => {
+  const saveBill = async ({ openBillDetails = false } = {}) => {
     if (receiptAccountMissing) {
       setLocalBillError(
         "Select a receipt account when paid amount is greater than zero (see Current Bill).",
       );
-      return;
+      return null;
     }
     setLocalBillError(null);
     const result = await dispatch(submitSale());
     if (submitSale.fulfilled.match(result)) {
+      const savedBill = result.payload;
       setBillModalOpen(false);
       dispatch(fetchItems());
+      if (openBillDetails && savedBill?.id) {
+        navigate(`/bills/${savedBill.id}`);
+      }
+      return savedBill;
     }
+    return null;
+  };
+
+  const handleSaveBill = async () => {
+    await saveBill();
+  };
+
+  const handleSaveAndPrint = async () => {
+    await saveBill({ openBillDetails: true });
   };
 
   const handleUpdateBill = () => {
@@ -1027,7 +1044,21 @@ export default function PosPage() {
               </button>
               <button
                 type="button"
-                className="primary-btn order-1 sm:order-3"
+                className="secondary-btn order-1 inline-flex items-center justify-center gap-2 sm:order-3"
+                onClick={handleSaveAndPrint}
+                disabled={pos.submitting || receiptAccountMissing}
+                title={
+                  receiptAccountMissing
+                    ? "Choose a receipt account first"
+                    : undefined
+                }
+              >
+                <Printer size={16} />
+                {pos.submitting ? "Saving..." : "Save & Print"}
+              </button>
+              <button
+                type="button"
+                className="primary-btn order-1 sm:order-4"
                 onClick={handleSaveBill}
                 disabled={pos.submitting || receiptAccountMissing}
                 title={

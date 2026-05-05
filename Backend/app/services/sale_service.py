@@ -1,17 +1,17 @@
 from decimal import Decimal
-from uuid import uuid4
 
 from app.models import Customer, FinancialAccount, Item, PaymentStatus, Sale, SaleItem, SaleStatus, db
 from app.models.enums import PaymentMethod as PaymentMethodEnum
 from app.services.accounting_service import AccountingService
 from app.services.inventory_service import InventoryService
+from app.services.invoice_number_service import InvoiceNumberService
 from app.utils.validators import parse_decimal, parse_int, require_fields
 
 
 class SaleService:
     @staticmethod
-    def _generate_invoice_number(user_id: int) -> str:
-        return f"SALE-{user_id}-{uuid4().hex[:12].upper()}"
+    def _generate_invoice_number() -> str:
+        return InvoiceNumberService.generate(Sale, "SINV")
 
     @staticmethod
     def _build_sale_item_instances(sale_items_data: list) -> tuple[Decimal, list]:
@@ -90,7 +90,7 @@ class SaleService:
         elif paid_amount > 0:
             payment_status = PaymentStatus.PARTIAL
 
-        invoice_number = str(payload.get("invoice_number") or "").strip() or SaleService._generate_invoice_number(user_id)
+        invoice_number = SaleService._generate_invoice_number()
 
         sale = Sale(
             invoice_number=invoice_number,

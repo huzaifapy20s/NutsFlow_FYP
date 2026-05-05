@@ -3,10 +3,15 @@ from decimal import Decimal
 from app.models import FinancialAccount, Item, PaymentStatus, Purchase, PurchaseItem, Supplier, db
 from app.services.accounting_service import AccountingService
 from app.services.inventory_service import InventoryService
+from app.services.invoice_number_service import InvoiceNumberService
 from app.utils.validators import parse_decimal, parse_int, require_fields
 
 
 class PurchaseService:
+    @staticmethod
+    def _generate_invoice_number() -> str:
+        return InvoiceNumberService.generate(Purchase, "PINV")
+
     @staticmethod
     def create_purchase(payload: dict, user_id: int) -> dict:
         require_fields(payload, ["supplier_id", "purchase_items"])
@@ -74,7 +79,7 @@ class PurchaseService:
         purchase = Purchase(
             supplier_id=supplier.id,
             payment_account_id=payment_account.id if payment_account else None,
-            invoice_number=payload.get("invoice_number"),
+            invoice_number=PurchaseService._generate_invoice_number(),
             subtotal=subtotal,
             discount_amount=discount_amount,
             tax_amount=tax_amount,
@@ -184,7 +189,10 @@ class PurchaseService:
 
         purchase.payment_account = new_account
         purchase.paid_amount = paid_amount
-        purchase.invoice_number = payload.get("invoice_number")
+        purchase.invoice_number = (
+            payload.get("invoice_number", purchase.invoice_number)
+            or purchase.invoice_number
+        )
         purchase.notes = payload.get("notes")
         purchase.payment_method = payload.get("payment_method")
         purchase.discount_amount = parse_decimal(payload.get("discount_amount", purchase.discount_amount), "discount_amount")
