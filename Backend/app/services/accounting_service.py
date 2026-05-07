@@ -120,15 +120,16 @@ class AccountingService:
         )
 
     @staticmethod
-    def create_sale_entry(sale, created_by_id: int) -> None:
+    def create_sale_entry(sale, created_by_id: int, sale_items: list | None = None) -> None:
         ar_account = AccountingService.get_chart_account_by_code(SYSTEM_ACCOUNT_CODES["accounts_receivable"])
         sales_revenue_account = AccountingService.get_chart_account_by_code(SYSTEM_ACCOUNT_CODES["sales_revenue"])
         cogs_account = AccountingService.get_chart_account_by_code(SYSTEM_ACCOUNT_CODES["cogs"])
         inventory_account = AccountingService.get_chart_account_by_code(SYSTEM_ACCOUNT_CODES["inventory"])
 
+        sale_item_rows = sale_items if sale_items is not None else sale.sale_items
         cogs_total = sum(
             (sale_item.quantity * sale_item.unit_cost_snapshot).quantize(Decimal("0.01"))
-            for sale_item in sale.sale_items
+            for sale_item in sale_item_rows
         )
 
         lines = []
@@ -154,14 +155,15 @@ class AccountingService:
                 }
             )
 
-        lines.append(
-            {
-                "account_id": sales_revenue_account.id,
-                "debit_amount": Decimal("0.00"),
-                "credit_amount": sale.total_amount,
-                "line_description": "Sales revenue recognized",
-            }
-        )
+        if sale.total_amount > 0:
+            lines.append(
+                {
+                    "account_id": sales_revenue_account.id,
+                    "debit_amount": Decimal("0.00"),
+                    "credit_amount": sale.total_amount,
+                    "line_description": "Sales revenue recognized",
+                }
+            )
 
         if cogs_total > 0:
             lines.append(
@@ -180,6 +182,9 @@ class AccountingService:
                     "line_description": "Inventory reduced",
                 }
             )
+
+        if not lines:
+            return
 
         AccountingService.create_journal_entry(
             entry_date=sale.sale_date.date(),

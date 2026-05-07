@@ -39,7 +39,7 @@ class SaleService:
 
             sale_item_objects.append(
                 SaleItem(
-                    item=item,
+                    item_id=item.id,
                     quantity=quantity,
                     unit_price=unit_price,
                     unit_cost_snapshot=unit_cost_snapshot,
@@ -226,6 +226,9 @@ class SaleService:
         old_paid = sale.paid_amount
         old_customer = sale.customer
         old_receipt = sale.receipt_account
+        new_customer = old_customer
+        new_receipt = old_receipt
+        accounting_sale_items = list(sale.sale_items)
 
         # Step 1: Reverse old customer balance effect
         if old_customer is not None and old_balance_due > 0:
@@ -256,8 +259,7 @@ class SaleService:
                 InventoryService.reverse_sale_stock(sale, old_lines, user_id)
 
             # Step 4c: Delete old sale item rows from the database
-            for line in list(sale.sale_items):
-                db.session.delete(line)
+            sale.sale_items.clear()
             db.session.flush()
             # After flush, old rows are removed from DB; sale.sale_items relationship is now empty
 
@@ -267,10 +269,10 @@ class SaleService:
 
             # Step 4e: Assign sale_id to each new item and add to session
             for sitem in new_item_objs:
-                sitem.sale_id = sale.id
-                db.session.add(sitem)
+                sale.sale_items.append(sitem)
             db.session.flush()
             # After flush, new rows are written to DB
+            accounting_sale_items = new_item_objs
 
             # Step 4f: Apply stock deduction for new sale items
             # IMPORTANT: We pass new_item_objs directly here — NOT sale.sale_items.
@@ -299,23 +301,25 @@ class SaleService:
         if "customer_id" in payload:
             cid = payload.get("customer_id")
             if cid in (None, ""):
-                sale.customer_id = None
+                new_customer = None
             else:
                 cust = Customer.query.get(parse_int(cid, "customer_id"))
                 if not cust or not cust.is_active:
                     raise LookupError("Customer not found or inactive.")
-                sale.customer_id = cust.id
+                new_customer = cust
+            sale.customer = new_customer
 
         # Step 7: Update receipt account if provided
         if "receipt_account_id" in payload:
             rid = payload.get("receipt_account_id")
             if rid in (None, ""):
-                sale.receipt_account_id = None
+                new_receipt = None
             else:
                 acct = FinancialAccount.query.get(parse_int(rid, "receipt_account_id"))
                 if not acct or not acct.is_active:
                     raise LookupError("Receipt account not found or inactive.")
-                sale.receipt_account_id = acct.id
+                new_receipt = acct
+            sale.receipt_account = new_receipt
 
         # Step 8: Update paid amount if provided
         paid = sale.paid_amount
@@ -325,7 +329,7 @@ class SaleService:
             raise ValueError("paid_amount cannot exceed total_amount.")
         sale.paid_amount = paid
 
-        if sale.paid_amount > 0 and not sale.receipt_account_id:
+        if sale.paid_amount > 0 and new_receipt is None:
             raise ValueError("receipt_account_id is required when paid_amount is greater than zero.")
 
         # Step 9: Update payment method if provided
@@ -345,7 +349,7 @@ class SaleService:
 
         # Step 11: Recalculate balance_due and payment_status
         sale.balance_due = (sale.total_amount - sale.paid_amount).quantize(Decimal("0.01"))
-        if sale.balance_due > 0 and not sale.customer_id:
+        if sale.balance_due > 0 and new_customer is None:
             raise ValueError("A customer is required when there is an outstanding balance.")
 
         if sale.balance_due <= 0:
@@ -356,18 +360,16 @@ class SaleService:
             sale.payment_status = PaymentStatus.UNPAID
 
         # Step 12: Apply new customer balance effect
-        new_customer = sale.customer
         if new_customer is not None and sale.balance_due > 0:
             new_customer.opening_balance = (new_customer.opening_balance + sale.balance_due).quantize(Decimal("0.01"))
 
         # Step 13: Apply new receipt account balance effect
-        new_receipt = sale.receipt_account
         if new_receipt is not None and sale.paid_amount > 0:
             new_receipt.current_balance = (new_receipt.current_balance + sale.paid_amount).quantize(Decimal("0.01"))
 
         # Step 14: Create fresh accounting journal entry for updated sale
         db.session.flush()
-        AccountingService.create_sale_entry(sale, created_by_id=user_id)
+        AccountingService.create_sale_entry(sale, created_by_id=user_id, sale_items=accounting_sale_items)
 
         db.session.commit()
         return SaleService.serialize_sale(sale)

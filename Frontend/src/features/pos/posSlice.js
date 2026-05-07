@@ -47,11 +47,11 @@ export const submitSale = createAsyncThunk("pos/submitSale", async (_, { getStat
 
     let paidNum = Number(String(state.paid_amount ?? "0").replace(/,/g, "."));
     if (!Number.isFinite(paidNum) || paidNum < 0) paidNum = 0;
-    if (!customerId && paidNum < totalAfterDiscount) {
-      paidNum = totalAfterDiscount;
-    }
     if (paidNum > totalAfterDiscount) {
       paidNum = totalAfterDiscount;
+    }
+    if (!customerId && roundMoney(totalAfterDiscount - paidNum) > 0) {
+      return rejectWithValue("Select a customer when the paid amount is less than the bill total.");
     }
     if (roundMoney(paidNum) > 0 && !receiptAccountId) {
       return rejectWithValue("Select a receipt account when payment is greater than zero.");

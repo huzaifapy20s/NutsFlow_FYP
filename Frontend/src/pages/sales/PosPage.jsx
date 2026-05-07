@@ -149,17 +149,10 @@ export default function PosPage() {
     const paid = Number(String(pos.paid_amount ?? "0").replace(/,/g, "."));
     if (!Number.isFinite(paid)) return;
     const roundedTotal = Math.max(0, Math.round(total * 100) / 100);
-    const roundedPaid = Math.round(paid * 100) / 100;
     if (roundedTotal <= 0) {
       if (paid > 0) {
         dispatch(setPosField({ field: "paid_amount", value: "0.00" }));
       }
-      return;
-    }
-    if (isWalkInCustomer && roundedPaid < roundedTotal) {
-      dispatch(
-        setPosField({ field: "paid_amount", value: roundedTotal.toFixed(2) }),
-      );
       return;
     }
     if (paid > roundedTotal + 1e-6) {
@@ -167,7 +160,7 @@ export default function PosPage() {
         setPosField({ field: "paid_amount", value: roundedTotal.toFixed(2) }),
       );
     }
-  }, [total, pos.paid_amount, isWalkInCustomer, dispatch]);
+  }, [total, pos.paid_amount, dispatch]);
 
   const [billModalOpen, setBillModalOpen] = useState(false);
   const [localBillError, setLocalBillError] = useState(null);
@@ -201,6 +194,7 @@ export default function PosPage() {
     Number(String(pos.paid_amount ?? "0").replace(/,/g, ".")) || 0;
   const balanceDisplay = Math.max(0, round2(total - paidNum));
   const paidIsPositive = round2(paidNum) > 0;
+  const customerMissingForBalance = balanceDisplay > 0 && isWalkInCustomer;
   const hasReceiptAccount = Boolean(
     String(pos.receipt_account_id || "").trim(),
   );
@@ -221,6 +215,12 @@ export default function PosPage() {
   };
 
   const saveBill = async ({ openBillDetails = false } = {}) => {
+    if (customerMissingForBalance) {
+      setLocalBillError(
+        "Select a customer when the paid amount is less than the bill total.",
+      );
+      return null;
+    }
     if (receiptAccountMissing) {
       setLocalBillError(
         "Select a receipt account when paid amount is greater than zero (see Current Bill).",
@@ -492,13 +492,19 @@ export default function PosPage() {
               <label className="label">Customer</label>
               <select
                 value={pos.customer_id}
-                onChange={(e) =>
+                onChange={(e) => {
                   dispatch(
                     setPosField({
                       field: "customer_id",
                       value: e.target.value,
                     }),
-                  )
+                  );
+                  if (localBillError) setLocalBillError(null);
+                }}
+                className={
+                  customerMissingForBalance && billModalOpen
+                    ? "ring-2 ring-amber-400"
+                    : ""
                 }
               >
                 <option value="">Walk-in customer</option>
@@ -674,19 +680,32 @@ export default function PosPage() {
                 <div>
                   <label className="label">Paid Amount</label>
                   <input
-                    type="number"
-                    min="0"
-                    max={total}
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={pos.paid_amount}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       dispatch(
                         setPosField({
                           field: "paid_amount",
-                          value: e.target.value,
+                          value: e.target.value.replace(/[^\d.,]/g, ""),
                         }),
-                      )
-                    }
+                      );
+                      if (localBillError) setLocalBillError(null);
+                    }}
+                    onBlur={() => {
+                      const paid = Number(
+                        String(pos.paid_amount ?? "0").replace(/,/g, "."),
+                      );
+                      const safePaid = Number.isFinite(paid)
+                        ? Math.min(Math.max(paid, 0), total)
+                        : 0;
+                      dispatch(
+                        setPosField({
+                          field: "paid_amount",
+                          value: safePaid.toFixed(2),
+                        }),
+                      );
+                    }}
                   />
                 </div>
               </div>
