@@ -1,12 +1,26 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import axiosClient from "../../api/axiosClient";
 
+const getApiErrorMessage = (error, fallback) => {
+  const data = error?.response?.data;
+
+  if (data?.message) return data.message;
+  if (typeof data === "string" && data.trim()) return data.trim();
+
+  if (!error?.response && error?.message === "Network Error") {
+    return `${fallback} The Flask backend did not respond to this route. Replace Backend/app/api/account_routes.py, then fully stop and restart the Flask server.`;
+  }
+
+  if (error?.message) return `${fallback} (${error.message})`;
+  return fallback;
+};
+
 export const fetchChartOfAccounts = createAsyncThunk("accounts/fetchChartOfAccounts", async (_, { rejectWithValue }) => {
   try {
     const response = await axiosClient.get("/api/accounts/chart-of-accounts");
     return response.data.data;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to fetch chart of accounts.");
+    return rejectWithValue(getApiErrorMessage(error, "Failed to fetch chart of accounts."));
   }
 });
 
@@ -15,7 +29,7 @@ export const fetchFinancialAccounts = createAsyncThunk("accounts/fetchFinancialA
     const response = await axiosClient.get("/api/accounts/financial-accounts");
     return response.data.data;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to fetch financial accounts.");
+    return rejectWithValue(getApiErrorMessage(error, "Failed to fetch financial accounts."));
   }
 });
 
@@ -31,7 +45,7 @@ export const fetchCustomerAccounts = createAsyncThunk("accounts/fetchCustomerAcc
       entity_type: "customer",
     }));
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to fetch customer accounts.");
+    return rejectWithValue(getApiErrorMessage(error, "Failed to fetch customer accounts."));
   }
 });
 
@@ -47,9 +61,21 @@ export const fetchSupplierAccounts = createAsyncThunk("accounts/fetchSupplierAcc
       entity_type: "supplier",
     }));
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to fetch supplier accounts.");
+    return rejectWithValue(getApiErrorMessage(error, "Failed to fetch supplier accounts."));
   }
 });
+
+export const createGeneralJournalEntry = createAsyncThunk(
+  "accounts/createGeneralJournalEntry",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const response = await axiosClient.post("/api/accounts/general-journal-entry", payload);
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(getApiErrorMessage(error, "Failed to save general journal entry."));
+    }
+  },
+);
 
 // General ledger for Chart of Accounts
 export const fetchGeneralLedger = createAsyncThunk("accounts/fetchGeneralLedger", async (accountId, { rejectWithValue }) => {
@@ -57,7 +83,7 @@ export const fetchGeneralLedger = createAsyncThunk("accounts/fetchGeneralLedger"
     const response = await axiosClient.get(`/api/accounts/general-ledger/${accountId}`);
     return response.data.data;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to fetch general ledger.");
+    return rejectWithValue(getApiErrorMessage(error, "Failed to fetch general ledger."));
   }
 });
 
@@ -67,7 +93,7 @@ export const fetchCustomerLedger = createAsyncThunk("accounts/fetchCustomerLedge
     const response = await axiosClient.get(`/api/accounts/customer-ledger/${customerId}`);
     return response.data.data;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to fetch customer ledger.");
+    return rejectWithValue(getApiErrorMessage(error, "Failed to fetch customer ledger."));
   }
 });
 
@@ -77,7 +103,7 @@ export const fetchSupplierLedger = createAsyncThunk("accounts/fetchSupplierLedge
     const response = await axiosClient.get(`/api/accounts/supplier-ledger/${supplierId}`);
     return response.data.data;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.message || "Failed to fetch supplier ledger.");
+    return rejectWithValue(getApiErrorMessage(error, "Failed to fetch supplier ledger."));
   }
 });
 
@@ -91,10 +117,17 @@ const accountsSlice = createSlice({
     generalLedger: null,
     ledgerLoading: false,
     ledgerError: null,
+    journalEntrySaving: false,
+    journalEntryError: null,
+    journalEntrySuccess: null,
     loading: false,
     error: null,
   },
   reducers: {
+    clearJournalEntryStatus: (state) => {
+      state.journalEntryError = null;
+      state.journalEntrySuccess = null;
+    },
     clearGeneralLedger: (state) => {
       state.generalLedger = null;
       state.ledgerError = null;
@@ -195,9 +228,22 @@ const accountsSlice = createSlice({
       .addCase(fetchSupplierLedger.rejected, (state, action) => {
         state.ledgerLoading = false;
         state.ledgerError = action.payload;
+      })
+      .addCase(createGeneralJournalEntry.pending, (state) => {
+        state.journalEntrySaving = true;
+        state.journalEntryError = null;
+        state.journalEntrySuccess = null;
+      })
+      .addCase(createGeneralJournalEntry.fulfilled, (state, action) => {
+        state.journalEntrySaving = false;
+        state.journalEntrySuccess = action.payload;
+      })
+      .addCase(createGeneralJournalEntry.rejected, (state, action) => {
+        state.journalEntrySaving = false;
+        state.journalEntryError = action.payload;
       });
   },
 });
 
-export const { clearGeneralLedger } = accountsSlice.actions;
+export const { clearGeneralLedger, clearJournalEntryStatus } = accountsSlice.actions;
 export default accountsSlice.reducer;

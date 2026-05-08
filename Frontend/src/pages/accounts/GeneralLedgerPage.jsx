@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   clearGeneralLedger,
+  clearJournalEntryStatus,
+  createGeneralJournalEntry,
   fetchCustomerLedger,
   fetchGeneralLedger,
   fetchSupplierLedger,
@@ -13,12 +15,16 @@ import {
   BadgeDollarSign,
   BookOpen,
   DollarSign,
+  Loader2,
+  NotebookPen,
   ReceiptText,
+  Save,
   Search,
   TrendingDown,
   TrendingUp,
   UserRound,
   X,
+  XCircle,
 } from "lucide-react";
 
 const accentColor = "#ffcf83";
@@ -55,6 +61,9 @@ const getReferenceBadgeClass = (referenceType = "") => {
   if (type.includes("opening")) {
     return "border-violet-200 bg-violet-50 text-violet-700";
   }
+  if (type.includes("journal") || type.includes("manual")) {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
 
   return "border-slate-200 bg-slate-50 text-slate-600";
 };
@@ -81,7 +90,7 @@ function LedgerMetric({ title, value, helper, icon: Icon, accent = false }) {
               : "border-slate-200 bg-slate-50 text-slate-700"
           }`}
         >
-          <Icon size={20} strokeWidth={2} />
+          {Icon ? createElement(Icon, { size: 20, strokeWidth: 2 }) : null}
         </div>
       </div>
     </div>
@@ -131,16 +140,197 @@ function AccountInfoCard({ account }) {
   );
 }
 
+
+function GeneralJournalEntryModal({
+  account,
+  ledgerType,
+  form,
+  onChange,
+  onClose,
+  onSubmit,
+  saving,
+  error,
+  balanceLabel,
+  closingBalance,
+}) {
+  if (!account) return null;
+
+  const activeType = account.entity_type || ledgerType;
+  const nameLabel =
+    activeType === "customer"
+      ? "Customer Name"
+      : activeType === "supplier"
+        ? "Supplier Name"
+        : "Account Name";
+
+  const scenarioHint = (() => {
+    if (activeType === "customer") {
+      return "Credit reduces the customer's balance due. Debit increases the customer's receivable balance.";
+    }
+    if (activeType === "supplier") {
+      return "Debit reduces the supplier payable balance. Credit increases the supplier payable balance.";
+    }
+    return "Debit or credit is posted to this selected account with a balanced offset journal line.";
+  })();
+
+  const handleFieldChange = (field, value) => {
+    onChange((previous) => ({ ...previous, [field]: value }));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-6 backdrop-blur-sm">
+      <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+          <div>
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: accentColor }}
+              />
+              Manual Ledger Posting
+            </div>
+            <h3 className="text-2xl font-bold text-slate-950">
+              General Journal Entry
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              {scenarioHint}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+            aria-label="Close general journal entry modal"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="space-y-5 px-6 py-6">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Entry Type
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {["credit", "debit"].map((side) => {
+                const selected = form.side === side;
+                return (
+                  <button
+                    key={side}
+                    type="button"
+                    onClick={() => handleFieldChange("side", side)}
+                    className={`rounded-2xl border px-4 py-3 text-sm font-bold capitalize transition focus:outline-none focus:ring-2 focus:ring-[#ffcf83]/70 ${
+                      selected
+                        ? "border-slate-950 bg-slate-950 text-white shadow-sm"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
+                    }`}
+                  >
+                    {side}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-sm font-semibold text-slate-700">
+                {nameLabel}
+              </span>
+              <input
+                type="text"
+                value={account.account_name || ""}
+                readOnly
+                className="mt-2 h-11 w-full rounded-xl border-slate-200 bg-slate-100 text-sm font-semibold text-slate-700"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-semibold text-slate-700">
+                Amount
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.amount}
+                onChange={(event) => handleFieldChange("amount", event.target.value)}
+                placeholder="Enter amount"
+                className="mt-2 h-11 w-full rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-900 focus:border-slate-900 focus:ring-[#ffcf83]/70"
+                required
+              />
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="text-sm font-semibold text-slate-700">
+              Description
+            </span>
+            <textarea
+              value={form.description}
+              onChange={(event) => handleFieldChange("description", event.target.value)}
+              placeholder="Describe this journal entry"
+              rows={4}
+              className="mt-2 w-full resize-none rounded-xl border-slate-200 bg-white text-sm font-medium text-slate-900 focus:border-slate-900 focus:ring-[#ffcf83]/70"
+            />
+          </label>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <span className="font-semibold text-slate-800">{balanceLabel}:</span>{" "}
+            {formatCurrency(closingBalance)}
+          </div>
+
+          {error ? (
+            <div className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <XCircle size={16} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          ) : null}
+
+          <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              {saving ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function GeneralLedgerPage() {
   const { accountId } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
   const [transactionSearchTerm, setTransactionSearchTerm] = useState("");
+  const [journalModalOpen, setJournalModalOpen] = useState(false);
+  const [journalForm, setJournalForm] = useState({
+    side: "debit",
+    amount: "",
+    description: "",
+  });
 
-  const { generalLedger, ledgerLoading, ledgerError } = useSelector(
-    (state) => state.accounts,
-  );
+  const {
+    generalLedger,
+    ledgerLoading,
+    ledgerError,
+    journalEntrySaving,
+    journalEntryError,
+  } = useSelector((state) => state.accounts);
 
   const searchParams = useMemo(
     () => new URLSearchParams(location.search),
@@ -161,6 +351,28 @@ export default function GeneralLedgerPage() {
     return "chart";
   }, [location.state, searchParams]);
 
+  const defaultJournalSide = useMemo(() => {
+    if (ledgerType === "customer") return "credit";
+    if (ledgerType === "supplier") return "debit";
+    return "debit";
+  }, [ledgerType]);
+
+  useEffect(() => {
+    dispatch(clearJournalEntryStatus());
+  }, [dispatch, accountId, defaultJournalSide]);
+
+  const reloadLedger = () => {
+    if (!accountId) return;
+
+    if (ledgerType === "customer") {
+      dispatch(fetchCustomerLedger(accountId));
+    } else if (ledgerType === "supplier") {
+      dispatch(fetchSupplierLedger(accountId));
+    } else {
+      dispatch(fetchGeneralLedger(accountId));
+    }
+  };
+
   useEffect(() => {
     if (!accountId) return;
 
@@ -178,9 +390,10 @@ export default function GeneralLedgerPage() {
   }, [dispatch, accountId, ledgerType]);
 
   const account = generalLedger?.account || null;
-  const entries = Array.isArray(generalLedger?.ledger_entries)
-    ? generalLedger.ledger_entries
-    : [];
+  const entries = useMemo(
+    () => (Array.isArray(generalLedger?.ledger_entries) ? generalLedger.ledger_entries : []),
+    [generalLedger],
+  );
 
   const totalDebit = useMemo(
     () => entries.reduce((sum, entry) => sum + toNumber(entry.debit), 0),
@@ -261,6 +474,39 @@ export default function GeneralLedgerPage() {
     !location.state?.entityType &&
     !searchParams.get("type") &&
     !searchParams.get("entityType");
+
+  const openJournalModal = () => {
+    dispatch(clearJournalEntryStatus());
+    setJournalForm({ side: defaultJournalSide, amount: "", description: "" });
+    setJournalModalOpen(true);
+  };
+
+  const closeJournalModal = () => {
+    if (journalEntrySaving) return;
+    dispatch(clearJournalEntryStatus());
+    setJournalModalOpen(false);
+  };
+
+  const handleJournalSubmit = async (event) => {
+    event.preventDefault();
+
+    const result = await dispatch(
+      createGeneralJournalEntry({
+        ledger_type: account?.entity_type || ledgerType,
+        entity_id: account?.id || Number(accountId),
+        account_id: account?.id || Number(accountId),
+        side: journalForm.side,
+        amount: journalForm.amount,
+        description: journalForm.description,
+      }),
+    );
+
+    if (createGeneralJournalEntry.fulfilled.match(result)) {
+      setJournalModalOpen(false);
+      setJournalForm({ side: defaultJournalSide, amount: "", description: "" });
+      reloadLedger();
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -364,6 +610,15 @@ export default function GeneralLedgerPage() {
                 </p>
               </div>
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  onClick={openJournalModal}
+                  disabled={!account}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-900 bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-500"
+                >
+                  <NotebookPen size={16} />
+                  General Journal Entry
+                </button>
                 <div className="relative w-full sm:w-80">
                   <Search
                     size={16}
@@ -536,6 +791,21 @@ export default function GeneralLedgerPage() {
           </section>
         </>
       )}
+
+      {journalModalOpen ? (
+        <GeneralJournalEntryModal
+          account={account}
+          ledgerType={ledgerType}
+          form={journalForm}
+          onChange={setJournalForm}
+          onClose={closeJournalModal}
+          onSubmit={handleJournalSubmit}
+          saving={journalEntrySaving}
+          error={journalEntryError}
+          balanceLabel={balanceLabel}
+          closingBalance={closingBalance}
+        />
+      ) : null}
     </div>
   );
 }
